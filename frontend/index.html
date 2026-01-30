@@ -267,8 +267,11 @@ sudo make install</code></pre>
         .text(<span class="string">"Hello, Galay!"</span>)
         .build();
 
-    <span class="keyword">co_await</span> conn.getWriter().sendResponse(response);
-    <span class="keyword">co_return</span>;
+    <span class="keyword">auto</span> writer = conn.getWriter();
+    <span class="keyword">while</span> (<span class="keyword">true</span>) {
+        <span class="keyword">auto</span> result = <span class="keyword">co_await</span> writer.sendResponse(response);
+        <span class="keyword">if</span> (!result || result.value()) <span class="keyword">break</span>;
+    }
 }
 
 <span class="type">int</span> <span class="function">main</span>() {

@@ -221,7 +221,10 @@ Coroutine helloHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
 }
 
 int main() {

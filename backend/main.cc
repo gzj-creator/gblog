@@ -98,7 +98,7 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             }},
             {"language", "C++20"},
             {"license", "MIT"},
-            {"github", "https://github.com/galay/galay-kernel"}
+            {"github", "https://github.com/gzj-creator/galay-kernel"}
         }},
         {"http", {
             {"id", "http"},
@@ -109,7 +109,7 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             {"transferModes", json::array({"MEMORY", "CHUNK", "SENDFILE", "AUTO"})},
             {"language", "C++20/23"},
             {"license", "MIT"},
-            {"github", "https://github.com/galay/galay-http"}
+            {"github", "https://github.com/gzj-creator/galay-http"}
         }},
         {"utils", {
             {"id", "utils"},
@@ -124,7 +124,7 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             }},
             {"language", "C++20"},
             {"license", "MIT"},
-            {"github", "https://github.com/galay/galay-utils"}
+            {"github", "https://github.com/gzj-creator/galay-utils"}
         }},
         {"mcp", {
             {"id", "mcp"},
@@ -134,7 +134,7 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             {"features", json::array({"标准输入输出通信", "简洁的工具注册 API", "C++23 std::expected 错误处理", "MCP 2024-11-05 规范兼容"})},
             {"language", "C++23"},
             {"license", "MIT"},
-            {"github", "https://github.com/galay/galay-mcp"}
+            {"github", "https://github.com/gzj-creator/galay-mcp"}
         }}
     };
 

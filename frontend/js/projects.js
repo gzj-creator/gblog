@@ -110,7 +110,7 @@ function renderProjects() {
                 <a href="#${project.id}" class="btn btn-primary" onclick="showProjectDetail('${project.id}'); return false;">
                     查看详情
                 </a>
-                <a href="https://github.com/galay/${project.name}" class="btn btn-secondary" target="_blank">
+                <a href="https://github.com/gzj-creator/${project.name}" class="btn btn-secondary" target="_blank">
                     GitHub
                 </a>
             </div>
@@ -293,7 +293,7 @@ function renderProjectDetail(project) {
                 <div class="project-sidebar-section">
                     <h3 class="project-sidebar-title">快速链接</h3>
                     <div class="project-sidebar-actions">
-                        <a href="https://github.com/galay/${project.name}" class="btn btn-primary" target="_blank">
+                        <a href="https://github.com/gzj-creator/${project.name}" class="btn btn-primary" target="_blank">
                             GitHub 仓库
                         </a>
                         <a href="docs.html" class="btn btn-secondary">

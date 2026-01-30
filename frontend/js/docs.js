@@ -198,8 +198,8 @@ sudo apt install cmake build-essential
 sudo dnf install cmake gcc-c++</code></pre>
 
             <h2>克隆项目</h2>
-            <pre><code>git clone https://github.com/galay/galay-kernel.git
-git clone https://github.com/galay/galay-http.git
+            <pre><code>git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-http.git
 cd galay-http</code></pre>
 
             <h2>编译运行</h2>
@@ -248,7 +248,7 @@ int main() {
             <p>Galay 框架采用 CMake 构建系统，支持多种编译选项。</p>
 
             <h3>基本编译</h3>
-            <pre><code>git clone https://github.com/galay/galay-http.git
+            <pre><code>git clone https://github.com/gzj-creator/galay-http.git
 cd galay-http
 mkdir build && cd build
 cmake ..
@@ -266,7 +266,7 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..</code></pre>
 
             <h2>作为子模块使用</h2>
-            <pre><code>git submodule add https://github.com/galay/galay-http.git third_party/galay-http</code></pre>
+            <pre><code>git submodule add https://github.com/gzj-creator/galay-http.git third_party/galay-http</code></pre>
 
             <p>在你的 CMakeLists.txt 中：</p>
             <pre><code>add_subdirectory(third_party/galay-http)

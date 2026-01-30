@@ -115,7 +115,7 @@ int main() {
 
         <hr>
 
-        <p><em>本文是 Galay 框架技术博客系列的一部分。更多精彩内容，请关注我们的 <a href="blog.html">博客</a> 和 <a href="https://github.com" target="_blank">GitHub</a>。</em></p>
+        <p><em>本文是 Galay 框架技术博客系列的一部分。更多精彩内容，请关注我们的 <a href="blog.html">博客</a> 和 <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>。</em></p>
     `;
 }
 

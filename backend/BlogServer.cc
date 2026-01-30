@@ -88,7 +88,7 @@ static std::map<std::string, ProjectInfo> g_projects = {
         {"极致性能：单线程 26-28万 QPS", "协程驱动：基于 C++20 标准协程", "跨平台：支持 macOS/Linux", "异步文件 IO"},
         "C++20",
         "MIT",
-        "https://github.com/galay/galay-kernel"
+        "https://github.com/gzj-creator/galay-kernel"
     }},
     {"http", {
         "http",
@@ -98,7 +98,7 @@ static std::map<std::string, ProjectInfo> g_projects = {
         {"高性能路由：O(1) 精确匹配", "静态文件服务：支持多种传输模式", "Range 请求：断点续传", "WebSocket：RFC 6455 标准"},
         "C++20/23",
         "MIT",
-        "https://github.com/galay/galay-http"
+        "https://github.com/gzj-creator/galay-http"
     }},
     {"utils", {
         "utils",
@@ -108,7 +108,7 @@ static std::map<std::string, ProjectInfo> g_projects = {
         {"线程池", "一致性哈希", "熔断器", "负载均衡"},
         "C++20",
         "MIT",
-        "https://github.com/galay/galay-utils"
+        "https://github.com/gzj-creator/galay-utils"
     }},
     {"mcp", {
         "mcp",
@@ -118,7 +118,7 @@ static std::map<std::string, ProjectInfo> g_projects = {
         {"JSON-RPC 通信", "工具注册 API", "类型安全", "标准兼容"},
         "C++23",
         "MIT",
-        "https://github.com/galay/galay-mcp"
+        "https://github.com/gzj-creator/galay-mcp"
     }}
 };
 

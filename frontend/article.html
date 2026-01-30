@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文章 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/article.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="https://github.com" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs.html" class="mobile-link">docs</a>
+        <a href="blog.html" class="mobile-link active">blog</a>
+        <a href="https://github.com" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <!-- Article Content -->
+    <main class="article-main">
+        <div class="container">
+            <article class="article" id="articleContent">
+                <!-- Article will be loaded dynamically -->
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                </div>
+            </article>
+
+            <!-- Back to Blog -->
+            <div class="article-nav">
+                <a href="blog.html" class="btn btn-secondary">
+                    <span>←</span> 返回博客列表
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">High-Performance C++20 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="projects.html#kernel">galay-kernel</a>
+                        <a href="projects.html#http">galay-http</a>
+                        <a href="projects.html#utils">galay-utils</a>
+                        <a href="projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>文档</h4>
+                        <a href="docs.html">快速开始</a>
+                        <a href="docs.html#api">API 参考</a>
+                        <a href="docs.html#examples">示例代码</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="blog.html">博客</a>
+                        <a href="#">GitHub</a>
+                        <a href="#">Issues</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++20</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/article.js"></script>
+</body>
+</html>

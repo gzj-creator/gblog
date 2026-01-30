@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>搜索 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/search.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="https://github.com" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs.html" class="mobile-link">docs</a>
+        <a href="blog.html" class="mobile-link">blog</a>
+        <a href="https://github.com" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <!-- Search Main -->
+    <main class="search-main">
+        <div class="container">
+            <!-- Search Header -->
+            <div class="search-header">
+                <h1 class="search-title">搜索</h1>
+                <div class="search-box">
+                    <span class="search-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </span>
+                    <input type="text" id="searchInput" class="search-input" placeholder="搜索文档、博客、项目..." autofocus>
+                    <span class="search-shortcut">
+                        <kbd>Ctrl</kbd> + <kbd>K</kbd>
+                    </span>
+                </div>
+                <div class="search-filters">
+                    <button class="filter-btn active" data-filter="all">全部</button>
+                    <button class="filter-btn" data-filter="docs">文档</button>
+                    <button class="filter-btn" data-filter="blog">博客</button>
+                    <button class="filter-btn" data-filter="projects">项目</button>
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <div class="search-results" id="searchResults">
+                <div class="search-empty">
+                    <div class="search-empty-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </div>
+                    <h3>输入关键词开始搜索</h3>
+                    <p>搜索文档、博客文章和项目信息</p>
+                </div>
+            </div>
+
+            <!-- Recent Searches -->
+            <div class="recent-searches" id="recentSearches">
+                <h3 class="recent-title">最近搜索</h3>
+                <div class="recent-list" id="recentList">
+                    <!-- Will be populated by JS -->
+                </div>
+            </div>
+
+            <!-- Popular Topics -->
+            <div class="popular-topics">
+                <h3 class="popular-title">热门主题</h3>
+                <div class="popular-tags">
+                    <a href="#" class="popular-tag" data-query="HTTP 服务器">HTTP 服务器</a>
+                    <a href="#" class="popular-tag" data-query="协程">协程</a>
+                    <a href="#" class="popular-tag" data-query="路由">路由</a>
+                    <a href="#" class="popular-tag" data-query="WebSocket">WebSocket</a>
+                    <a href="#" class="popular-tag" data-query="性能优化">性能优化</a>
+                    <a href="#" class="popular-tag" data-query="静态文件">静态文件</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">High-Performance C++20 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="projects.html#kernel">galay-kernel</a>
+                        <a href="projects.html#http">galay-http</a>
+                        <a href="projects.html#utils">galay-utils</a>
+                        <a href="projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>文档</h4>
+                        <a href="docs.html">快速开始</a>
+                        <a href="docs.html#api">API 参考</a>
+                        <a href="docs.html#examples">示例代码</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="blog.html">博客</a>
+                        <a href="#">GitHub</a>
+                        <a href="#">Issues</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++20</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/search.js"></script>
+</body>
+</html>

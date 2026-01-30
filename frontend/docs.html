@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/docs.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs.html" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="https://github.com" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs.html" class="mobile-link active">docs</a>
+        <a href="blog.html" class="mobile-link">blog</a>
+        <a href="https://github.com" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <!-- Page Header -->
+    <header class="page-header centered">
+        <div class="container">
+            <span class="page-tag">// documentation</span>
+            <h1 class="page-title">文档中心</h1>
+            <p class="page-subtitle">从入门到精通，全面了解 Galay 框架的使用方法</p>
+        </div>
+    </header>
+
+    <!-- Docs Content -->
+    <main class="docs-main">
+        <div class="container">
+            <div class="docs-layout">
+                <!-- Sidebar -->
+                <aside class="docs-sidebar">
+                    <div class="docs-sidebar-section">
+                        <h3 class="docs-sidebar-title">快速开始</h3>
+                        <ul class="docs-sidebar-list" id="gettingStartedList">
+                            <!-- Will be loaded dynamically -->
+                        </ul>
+                    </div>
+                    <div class="docs-sidebar-section">
+                        <h3 class="docs-sidebar-title">使用指南</h3>
+                        <ul class="docs-sidebar-list" id="guideList">
+                            <!-- Will be loaded dynamically -->
+                        </ul>
+                    </div>
+                    <div class="docs-sidebar-section">
+                        <h3 class="docs-sidebar-title">进阶主题</h3>
+                        <ul class="docs-sidebar-list" id="advancedList">
+                            <!-- Will be loaded dynamically -->
+                        </ul>
+                    </div>
+                    <div class="docs-sidebar-section">
+                        <h3 class="docs-sidebar-title">API 参考</h3>
+                        <ul class="docs-sidebar-list" id="apiList">
+                            <!-- Will be loaded dynamically -->
+                        </ul>
+                    </div>
+                </aside>
+
+                <!-- Main Content -->
+                <div class="docs-content" id="docsContent">
+                    <!-- Default: Quick Start Guide -->
+                    <div class="docs-welcome">
+                        <h1>欢迎使用 Galay Framework</h1>
+                        <p class="docs-welcome-intro">
+                            Galay 是一个高性能的 C++20 异步网络框架，提供了协程驱动的 IO 运行时、HTTP/WebSocket 服务器、以及丰富的工具库。
+                        </p>
+
+                        <div class="docs-quick-links">
+                            <a href="#" class="docs-quick-link" data-doc="quick-start">
+                                <span class="docs-quick-link-icon">🚀</span>
+                                <div>
+                                    <h3>快速开始</h3>
+                                    <p>5 分钟内搭建你的第一个 Galay 应用</p>
+                                </div>
+                            </a>
+                            <a href="#" class="docs-quick-link" data-doc="installation">
+                                <span class="docs-quick-link-icon">📦</span>
+                                <div>
+                                    <h3>安装指南</h3>
+                                    <p>详细的安装和配置说明</p>
+                                </div>
+                            </a>
+                            <a href="#" class="docs-quick-link" data-doc="http-server">
+                                <span class="docs-quick-link-icon">🌐</span>
+                                <div>
+                                    <h3>HTTP 服务器</h3>
+                                    <p>使用 HttpServer 创建 Web 服务</p>
+                                </div>
+                            </a>
+                            <a href="#" class="docs-quick-link" data-doc="api-httpserver">
+                                <span class="docs-quick-link-icon">📖</span>
+                                <div>
+                                    <h3>API 参考</h3>
+                                    <p>完整的 API 文档</p>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="docs-code-example">
+                            <h2>Hello World 示例</h2>
+                            <div class="code-window">
+                                <div class="code-window-header">
+                                    <div class="code-window-dots">
+                                        <span class="dot red"></span>
+                                        <span class="dot yellow"></span>
+                                        <span class="dot green"></span>
+                                    </div>
+                                    <span class="code-window-title">main.cc</span>
+                                </div>
+                                <pre class="code-window-content"><code>#include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpRouter.h"
+
+using namespace galay::http;
+
+Coroutine helloHandler(HttpConn& conn, HttpRequest req) {
+    auto response = Http1_1ResponseBuilder::ok()
+        .text("Hello, Galay!")
+        .build();
+
+    auto writer = conn.getWriter();
+    co_await writer.sendResponse(response);
+}
+
+int main() {
+    HttpRouter router;
+    router.addHandler&lt;HttpMethod::GET&gt;("/hello", helloHandler);
+
+    HttpServerConfig config;
+    config.port = 8080;
+
+    HttpServer server(config);
+    server.start(std::move(router));
+
+    return 0;
+}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="docs-features">
+                            <h2>核心特性</h2>
+                            <div class="docs-features-grid">
+                                <div class="docs-feature">
+                                    <span class="docs-feature-icon">⚡</span>
+                                    <h3>极致性能</h3>
+                                    <p>单线程 26-28 万 QPS，基于 kqueue/epoll/io_uring</p>
+                                </div>
+                                <div class="docs-feature">
+                                    <span class="docs-feature-icon">🔄</span>
+                                    <h3>协程驱动</h3>
+                                    <p>基于 C++20 标准协程，代码简洁直观</p>
+                                </div>
+                                <div class="docs-feature">
+                                    <span class="docs-feature-icon">🌍</span>
+                                    <h3>跨平台</h3>
+                                    <p>支持 macOS (kqueue) 和 Linux (epoll/io_uring)</p>
+                                </div>
+                                <div class="docs-feature">
+                                    <span class="docs-feature-icon">🛠️</span>
+                                    <h3>功能丰富</h3>
+                                    <p>HTTP/WebSocket、静态文件、路由系统一应俱全</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">High-Performance C++20 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="projects.html#kernel">galay-kernel</a>
+                        <a href="projects.html#http">galay-http</a>
+                        <a href="projects.html#utils">galay-utils</a>
+                        <a href="projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>文档</h4>
+                        <a href="docs.html">快速开始</a>
+                        <a href="docs.html#api">API 参考</a>
+                        <a href="docs.html#examples">示例代码</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="blog.html">博客</a>
+                        <a href="#">GitHub</a>
+                        <a href="#">Issues</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++20</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/docs.js"></script>
+</body>
+</html>

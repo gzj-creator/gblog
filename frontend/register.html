@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>注册 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/auth.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs.html" class="mobile-link">docs</a>
+        <a href="blog.html" class="mobile-link">blog</a>
+    </div>
+
+    <!-- Auth Container -->
+    <main class="auth-main">
+        <div class="auth-container">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <div class="auth-logo">[galay]</div>
+                    <h1 class="auth-title">创建账户</h1>
+                    <p class="auth-subtitle">加入 Galay 开发者社区</p>
+                </div>
+
+                <form class="auth-form" id="registerForm">
+                    <div class="form-group">
+                        <label for="username" class="form-label">用户名</label>
+                        <div class="form-input-wrapper">
+                            <span class="form-input-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                            </span>
+                            <input type="text" id="username" name="username" class="form-input" placeholder="请输入用户名" required autocomplete="username" minlength="3" maxlength="20">
+                        </div>
+                        <span class="form-hint">3-20 个字符，支持字母、数字和下划线</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email" class="form-label">邮箱</label>
+                        <div class="form-input-wrapper">
+                            <span class="form-input-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                    <polyline points="22,6 12,13 2,6"/>
+                                </svg>
+                            </span>
+                            <input type="email" id="email" name="email" class="form-input" placeholder="请输入邮箱地址" autocomplete="email">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password" class="form-label">密码</label>
+                        <div class="form-input-wrapper">
+                            <span class="form-input-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </span>
+                            <input type="password" id="password" name="password" class="form-input" placeholder="请输入密码" required autocomplete="new-password" minlength="6">
+                            <button type="button" class="form-input-toggle" onclick="togglePassword('password')">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="eye-open">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="eye-closed hidden">
+                                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                    <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="password-strength" id="passwordStrength">
+                            <div class="strength-bar">
+                                <span class="strength-segment"></span>
+                                <span class="strength-segment"></span>
+                                <span class="strength-segment"></span>
+                                <span class="strength-segment"></span>
+                            </div>
+                            <span class="strength-text">密码强度</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmPassword" class="form-label">确认密码</label>
+                        <div class="form-input-wrapper">
+                            <span class="form-input-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </span>
+                            <input type="password" id="confirmPassword" name="confirmPassword" class="form-input" placeholder="请再次输入密码" required autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <div class="form-options">
+                        <label class="form-checkbox">
+                            <input type="checkbox" id="agree" name="agree" required>
+                            <span class="checkmark"></span>
+                            我已阅读并同意 <a href="#" class="form-link">服务条款</a> 和 <a href="#" class="form-link">隐私政策</a>
+                        </label>
+                    </div>
+
+                    <div class="form-error hidden" id="registerError"></div>
+
+                    <button type="submit" class="btn btn-primary btn-full" id="registerBtn">
+                        <span class="btn-text">注册</span>
+                        <span class="btn-loading hidden">
+                            <span class="spinner"></span>
+                        </span>
+                    </button>
+                </form>
+
+                <div class="auth-footer">
+                    <p>已有账户? <a href="login.html" class="auth-link">立即登录</a></p>
+                </div>
+            </div>
+
+            <div class="auth-decoration">
+                <div class="auth-code-block">
+                    <pre><code><span class="code-comment">// 加入 Galay 社区</span>
+<span class="code-keyword">auto</span> result = <span class="code-keyword">co_await</span> auth.register({
+    .username = <span class="code-string">"developer"</span>,
+    .email = <span class="code-string">"dev@galay.io"</span>,
+    .password = <span class="code-string">"********"</span>
+});
+
+<span class="code-keyword">if</span> (result.success) {
+    <span class="code-comment">// 欢迎加入!</span>
+    sendWelcomeEmail(result.user);
+}</code></pre>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer footer-minimal">
+        <div class="container">
+            <p>&copy; 2024 Galay Framework. MIT License.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

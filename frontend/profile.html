@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/auth.css">
+    <link rel="stylesheet" href="css/profile.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs.html" class="mobile-link">docs</a>
+        <a href="blog.html" class="mobile-link">blog</a>
+    </div>
+
+    <!-- Profile Main -->
+    <main class="profile-main">
+        <div class="container">
+            <div class="profile-layout">
+                <!-- Sidebar -->
+                <aside class="profile-sidebar">
+                    <div class="profile-card">
+                        <div class="profile-avatar" id="profileAvatar">
+                            <span class="profile-avatar-text">U</span>
+                        </div>
+                        <h2 class="profile-name" id="profileName">用户</h2>
+                        <p class="profile-email" id="profileEmail">user@example.com</p>
+                        <div class="profile-stats">
+                            <div class="profile-stat">
+                                <span class="profile-stat-value">0</span>
+                                <span class="profile-stat-label">文章</span>
+                            </div>
+                            <div class="profile-stat">
+                                <span class="profile-stat-value">0</span>
+                                <span class="profile-stat-label">评论</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <nav class="profile-nav">
+                        <a href="#profile" class="profile-nav-item active" data-tab="profile">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            个人资料
+                        </a>
+                        <a href="#security" class="profile-nav-item" data-tab="security">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                            安全设置
+                        </a>
+                        <a href="#notifications" class="profile-nav-item" data-tab="notifications">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                            通知设置
+                        </a>
+                        <a href="#" class="profile-nav-item danger" onclick="logout(); return false;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                                <polyline points="16 17 21 12 16 7"/>
+                                <line x1="21" y1="12" x2="9" y2="12"/>
+                            </svg>
+                            退出登录
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Content -->
+                <div class="profile-content">
+                    <!-- Profile Tab -->
+                    <section class="profile-section active" id="profileTab">
+                        <h2 class="profile-section-title">个人资料</h2>
+
+                        <form class="profile-form" id="profileForm">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="displayName" class="form-label">显示名称</label>
+                                    <input type="text" id="displayName" name="displayName" class="form-input" placeholder="你的显示名称">
+                                </div>
+                                <div class="form-group">
+                                    <label for="username" class="form-label">用户名</label>
+                                    <input type="text" id="username" name="username" class="form-input" disabled>
+                                    <span class="form-hint">用户名不可修改</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email" class="form-label">邮箱地址</label>
+                                <input type="email" id="email" name="email" class="form-input" placeholder="your@email.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="bio" class="form-label">个人简介</label>
+                                <textarea id="bio" name="bio" class="form-textarea" rows="4" placeholder="介绍一下你自己..."></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="website" class="form-label">个人网站</label>
+                                <input type="url" id="website" name="website" class="form-input" placeholder="https://your-website.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="github" class="form-label">GitHub</label>
+                                <div class="form-input-wrapper">
+                                    <span class="form-input-prefix">github.com/</span>
+                                    <input type="text" id="github" name="github" class="form-input form-input-with-prefix" placeholder="username">
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">保存更改</button>
+                                <button type="reset" class="btn btn-secondary">取消</button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <!-- Security Tab -->
+                    <section class="profile-section" id="securityTab">
+                        <h2 class="profile-section-title">安全设置</h2>
+
+                        <div class="security-section">
+                            <h3>修改密码</h3>
+                            <form class="profile-form" id="passwordForm">
+                                <div class="form-group">
+                                    <label for="currentPassword" class="form-label">当前密码</label>
+                                    <input type="password" id="currentPassword" name="currentPassword" class="form-input" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="newPassword" class="form-label">新密码</label>
+                                    <input type="password" id="newPassword" name="newPassword" class="form-input" required minlength="6">
+                                </div>
+                                <div class="form-group">
+                                    <label for="confirmNewPassword" class="form-label">确认新密码</label>
+                                    <input type="password" id="confirmNewPassword" name="confirmNewPassword" class="form-input" required>
+                                </div>
+                                <div class="form-error hidden" id="passwordError"></div>
+                                <div class="form-success hidden" id="passwordSuccess"></div>
+                                <button type="submit" class="btn btn-primary">更新密码</button>
+                            </form>
+                        </div>
+
+                        <div class="security-section">
+                            <h3>登录历史</h3>
+                            <div class="login-history">
+                                <div class="login-item">
+                                    <div class="login-info">
+                                        <span class="login-device">当前设备</span>
+                                        <span class="login-time">刚刚</span>
+                                    </div>
+                                    <span class="login-status active">活跃</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="security-section danger-zone">
+                            <h3>危险区域</h3>
+                            <p>删除账户后，所有数据将被永久删除且无法恢复。</p>
+                            <button class="btn btn-danger" onclick="confirmDeleteAccount()">删除账户</button>
+                        </div>
+                    </section>
+
+                    <!-- Notifications Tab -->
+                    <section class="profile-section" id="notificationsTab">
+                        <h2 class="profile-section-title">通知设置</h2>
+
+                        <form class="profile-form" id="notificationsForm">
+                            <div class="notification-group">
+                                <div class="notification-item">
+                                    <div class="notification-info">
+                                        <h4>邮件通知</h4>
+                                        <p>接收重要更新和通知邮件</p>
+                                    </div>
+                                    <label class="toggle">
+                                        <input type="checkbox" name="emailNotifications" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="notification-item">
+                                    <div class="notification-info">
+                                        <h4>新文章通知</h4>
+                                        <p>当有新博客文章发布时通知我</p>
+                                    </div>
+                                    <label class="toggle">
+                                        <input type="checkbox" name="newPostNotifications" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="notification-item">
+                                    <div class="notification-info">
+                                        <h4>评论回复</h4>
+                                        <p>当有人回复我的评论时通知我</p>
+                                    </div>
+                                    <label class="toggle">
+                                        <input type="checkbox" name="commentReplyNotifications" checked>
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+
+                                <div class="notification-item">
+                                    <div class="notification-info">
+                                        <h4>版本更新</h4>
+                                        <p>当 Galay 框架发布新版本时通知我</p>
+                                    </div>
+                                    <label class="toggle">
+                                        <input type="checkbox" name="releaseNotifications">
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary">保存设置</button>
+                            </div>
+                        </form>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer footer-minimal">
+        <div class="container">
+            <p>&copy; 2024 Galay Framework. MIT License.</p>
+        </div>
+    </footer>
+
+    <script src="js/main.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/profile.js"></script>
+</body>
+</html>

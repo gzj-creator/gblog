@@ -1,120 +1,67 @@
 #include "galay-http/utils/HttpLogger.h"
 #include <galay-http/kernel/http/HttpServer.h>
 #include <galay-http/kernel/http/HttpRouter.h>
-#include <galay-http/utils/Http1_1ResponseBuilder.h>
 #include <chrono>
-#include <filesystem>
-#include <fstream>
+#include <cstdlib>
 #include <string>
 #include <thread>
 
 using namespace galay::http;
 
-
-namespace fs = std::filesystem;
-
-static bool readFileToString(const fs::path& path, std::string& out) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        return false;
+static std::string getEnvOrDefault(const char* key, const std::string& fallback) {
+    const char* value = std::getenv(key);
+    if (value == nullptr || *value == '\0') {
+        return fallback;
     }
-    out.assign((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-    return true;
+    return value;
 }
 
-static void addNoCacheHeaders(Http1_1ResponseBuilder& builder) {
-    builder
-        .header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
-        .header("Pragma", "no-cache")
-        .header("Expires", "0");
-}
-
-static Coroutine sendResponse(HttpConn& conn, HttpResponse response) {
-    auto writer = conn.getWriter();
-    while (true) {
-        auto result = co_await writer.sendResponse(response);
-        if (!result || result.value()) break;
+static uint16_t getPortFromEnv(const char* key, uint16_t fallback) {
+    const char* value = std::getenv(key);
+    if (value == nullptr || *value == '\0') {
+        return fallback;
     }
-    co_return;
-}
 
-static Coroutine sendJson(HttpConn& conn, HttpStatusCode status, const std::string& body) {
-    auto builder = Http1_1ResponseBuilder()
-        .status(status)
-        .header("Server", "Galay-Static/1.0")
-        .header("Access-Control-Allow-Origin", "*")
-        .json(body);
-    addNoCacheHeaders(builder);
-
-    auto response = builder.buildMove();
-    co_await sendResponse(conn, std::move(response)).wait();
-    co_return;
-}
-
-static Coroutine sendJsonFile(HttpConn& conn, const fs::path& path) {
-    std::string body;
-    if (!readFileToString(path, body)) {
-        co_await sendJson(conn, HttpStatusCode::NotFound_404, R"({"error":"Not Found"})").wait();
-        co_return;
+    try {
+        const int port = std::stoi(value);
+        if (port <= 0 || port > 65535) {
+            return fallback;
+        }
+        return static_cast<uint16_t>(port);
+    } catch (...) {
+        return fallback;
     }
-    co_await sendJson(conn, HttpStatusCode::OK_200, body).wait();
-    co_return;
-}
-
-static std::string extractIdFromUri(const std::string& uri) {
-    size_t lastSlash = uri.rfind('/');
-    if (lastSlash == std::string::npos || lastSlash + 1 >= uri.size()) {
-        return {};
-    }
-    std::string id = uri.substr(lastSlash + 1);
-    size_t queryPos = id.find('?');
-    if (queryPos != std::string::npos) {
-        id = id.substr(0, queryPos);
-    }
-    return id;
 }
 
 int main()
 {
-    HttpServer server;
     HttpLogger::console();
+
+    const std::string host = getEnvOrDefault("STATIC_HOST", "0.0.0.0");
+    const uint16_t port = getPortFromEnv("STATIC_PORT", 8080);
+    const std::string frontendRoot = getEnvOrDefault("STATIC_FRONTEND_ROOT", "./frontend");
+    const std::string apiUpstreamHost = getEnvOrDefault("API_PROXY_UPSTREAM_HOST", "127.0.0.1");
+    const uint16_t apiUpstreamPort = getPortFromEnv("API_PROXY_UPSTREAM_PORT", 8081);
+
+    HttpServerConfig config;
+    config.host = host;
+    config.port = port;
+
+    HttpServer server(config);
     HttpRouter router;
-    const fs::path dataRoot = "./frontend/data";
 
-    router.addHandler<HttpMethod::GET>("/api/projects",
-        [dataRoot](HttpConn& conn, HttpRequest req) -> Coroutine {
-            (void)req;
-            co_await sendJsonFile(conn, dataRoot / "projects.json").wait();
-            co_return;
-        });
-
-    router.addHandler<HttpMethod::GET>("/api/posts",
-        [dataRoot](HttpConn& conn, HttpRequest req) -> Coroutine {
-            (void)req;
-            co_await sendJsonFile(conn, dataRoot / "posts.json").wait();
-            co_return;
-        });
-
-    router.addHandler<HttpMethod::GET>("/api/posts/:id",
-        [dataRoot](HttpConn& conn, HttpRequest req) -> Coroutine {
-            std::string postId = extractIdFromUri(req.header().uri());
-            if (postId.empty()) {
-                co_await sendJson(conn, HttpStatusCode::BadRequest_400, R"({"error":"Invalid id"})").wait();
-                co_return;
-            }
-            co_await sendJsonFile(conn, dataRoot / "posts" / (postId + ".json")).wait();
-            co_return;
-        });
+    // /api/xxx -> upstream /xxx（Raw proxy 模式）
+    router.proxy("/api", apiUpstreamHost, apiUpstreamPort, ProxyMode::Raw);
 
     StaticFileConfig staticConfig;
     staticConfig.setTransferMode(FileTransferMode::AUTO);
     staticConfig.setEnableETag(false);  // 开发模式：禁用 ETag 条件缓存
-    router.mount("/", "./frontend", staticConfig);
+    router.mount("/", frontendRoot, staticConfig);
 
     server.start(std::move(router));
 
-    while(true) {
-        std::this_thread::sleep_for(std::chrono::seconds(100));
+    while (server.isRunning()) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     return 0;

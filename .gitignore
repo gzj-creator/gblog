@@ -24,6 +24,7 @@ frontend/data/
 
 # Service runtime / build artifacts
 service/static/server
+service/static/.env
 service/**/__pycache__/
 service/**/venv/
 service/**/.venv/

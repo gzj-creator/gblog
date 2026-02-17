@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-mongo 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-mongo 使用文档</h1>
+            <p class="page-subtitle">提供 MongoDB OP_MSG/BSON 通信与认证能力，支持同步/异步及 Pipeline 请求。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Database</span>
+                    <h1 class="docs-article-title">galay-mongo 使用文档</h1>
+                    <p class="docs-article-description">提供 MongoDB OP_MSG/BSON 通信与认证能力，支持同步/异步及 Pipeline 请求。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-mongo 是 Galay 库体系的 MongoDB 客户端组件，覆盖 OP_MSG、BSON、同步/异步与 pipeline 请求。</p>
+<p>它负责协议通信与认证流程，集合结构设计和高级查询封装由应用层实现。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>MongoClient（sync）</strong> — 同步会话接口，覆盖 <code>connect/ping/find/insert/update/delete</code></li>
+<li><strong>AsyncMongoClient（async）</strong> — 协程接口，支持 Pipeline 并发请求</li>
+<li><strong>MongoDocument</strong> — 文档构造与 BSON 编解码核心结构</li>
+<li><strong>认证路径</strong> — 同步与异步连接都支持 SCRAM-SHA-256</li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>同步 Ping（example/include/E1-SyncPing.cc）</h3>
+<pre><code>#include "galay-mongo/sync/MongoClient.h"
+
+using namespace galay::mongo;
+
+int main() {
+    MongoClient session;
+
+    MongoConfig cfg;
+    cfg.host = "127.0.0.1";
+    cfg.port = 27017;
+    cfg.database = "admin";
+
+    auto connected = session.connect(cfg);
+    if (!connected) return 1;
+
+    auto ping = session.ping(cfg.database);
+    if (!ping) return 1;
+
+    session.close();
+    return 0;
+}</code></pre>
+
+<h3>同步 CRUD（example/include/E3-SyncCrud.cc）</h3>
+<pre><code>#include "galay-mongo/sync/MongoClient.h"
+
+MongoClient session;
+MongoConfig cfg;
+cfg.database = "admin";
+session.connect(cfg);
+
+MongoDocument doc;
+doc.append("_id", int64_t(1));
+doc.append("name", "sync-example");
+session.insertOne(cfg.database, "items", doc);
+
+MongoDocument filter;
+filter.append("_id", int64_t(1));
+session.findOne(cfg.database, "items", filter);
+session.deleteOne(cfg.database, "items", filter);</code></pre>
+
+<h3>异步 Pipeline（example/include/E4-AsyncPipeline.cc）</h3>
+<pre><code>Coroutine run(IOScheduler* scheduler, MongoConfig cfg, AsyncMongoConfig async_cfg) {
+    AsyncMongoClient client(scheduler, async_cfg);
+    co_await client.connect(cfg);
+
+    std::vector&lt;MongoDocument&gt; commands;
+    MongoDocument c1; c1.append("ping", int32_t(1));
+    MongoDocument c2; c2.append("hello", int32_t(1));
+    commands.push_back(std::move(c1));
+    commands.push_back(std::move(c2));
+
+    auto result = co_await client.pipeline(cfg.database, std::move(commands));
+    co_await client.close();
+}</code></pre>
+
+<h3>示例入口（与仓库一致）</h3>
+<ul>
+<li><code>E1-SyncPing</code>、<code>E2-AsyncPing</code></li>
+<li><code>E3-SyncCrud</code>、<code>E4-AsyncPipeline</code>、<code>E5-AsyncCommandCrud</code></li>
+<li>源码路径：<code>example/include/</code> 与 <code>example/import/</code></li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DGALAY_MONGO_BUILD_TESTS=ON/OFF
+-DGALAY_MONGO_BUILD_EXAMPLES=ON/OFF
+-DGALAY_MONGO_BUILD_BENCHMARKS=ON/OFF
+-DGALAY_MONGO_BUILD_SHARED_LIBS=ON/OFF
+-DGALAY_MONGO_ENABLE_IMPORT_COMPILATION=ON/OFF
+-DGALAY_MONGO_BUILD_MODULE_EXAMPLES=ON/OFF</code></pre>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.20+、OpenSSL、spdlog、galay-kernel。</p>
+<p>运行示例/测试需要可访问的 MongoDB 实例。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-mongo" target="_blank">https://github.com/gzj-creator/galay-mongo</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

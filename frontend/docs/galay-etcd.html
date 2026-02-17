@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-etcd 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-etcd 使用文档</h1>
+            <p class="page-subtitle">提供 etcd v3 的 KV、租约、前缀查询与 Pipeline 能力，适用于配置与服务发现。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Service Discovery</span>
+                    <h1 class="docs-article-title">galay-etcd 使用文档</h1>
+                    <p class="docs-article-description">提供 etcd v3 的 KV、租约、前缀查询与 Pipeline 能力，适用于配置与服务发现。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-etcd 是 Galay 库体系的 etcd v3 客户端组件，提供 KV、租约、前缀与 pipeline 操作。</p>
+<p>它用于配置中心与服务发现访问层，集群治理和权限策略由外部系统负责。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>AsyncEtcdClient</strong> — 底层协程客户端，封装 v3 HTTP/JSON 请求与响应解析</li>
+<li><strong>EtcdClient（sync wrapper）</strong> — 面向业务侧的会话封装，暴露 <code>put/get/del/lease/pipeline</code></li>
+<li><strong>PipelineOp</strong> — 对应 etcd txn success ops，支持 Put/Get/Del 组合提交</li>
+<li><strong>状态回读</strong> — 通过 <code>lastKeyValues/lastLeaseId/lastDeletedCount</code> 获取最近结果</li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>最小 Smoke 流程（test/T1-EtcdSmoke.cc）</h3>
+<pre><code>#include "galay-etcd/sync/EtcdClient.h"
+
+using namespace galay::etcd;
+
+Coroutine run(IOScheduler* scheduler) {
+    EtcdConfig cfg;
+    cfg.endpoint = "http://127.0.0.1:2379";
+    cfg.api_prefix = "/v3";
+    EtcdClient session(scheduler, cfg);
+
+    co_await session.connect();
+    co_await session.put("/galay/key", "value");
+    co_await session.get("/galay/key");
+    co_await session.del("/galay/key");
+    co_await session.grantLease(3);
+    co_await session.close();
+}</code></pre>
+
+<h3>前缀与 Pipeline（API 对齐）</h3>
+<pre><code>// 前缀查询：get(key, prefix=true)
+co_await session.get("/services/app/", true);
+
+// 前缀删除：del(key, prefix=true)
+co_await session.del("/services/app/", true);
+
+// Pipeline：提交 Put/Get/Del 组合
+std::vector&lt;EtcdClient::PipelineOp&gt; ops;
+ops.push_back(EtcdClient::PipelineOp::Put("/k1", "v1"));
+ops.push_back(EtcdClient::PipelineOp::Get("/k1"));
+ops.push_back(EtcdClient::PipelineOp::Del("/k1"));
+co_await session.pipeline(std::move(ops));</code></pre>
+
+<h3>测试入口（与仓库一致）</h3>
+<ul>
+<li><code>T1-EtcdSmoke</code> — KV + lease 生命周期</li>
+<li><code>T2-EtcdPrefixOps</code> — 前缀范围与删除</li>
+<li><code>T3-EtcdPipeline</code> — txn success ops 管道</li>
+<li><code>B1-EtcdKvBenchmark</code> — KV 压测</li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+
+# 功能测试
+./build/test/T1-EtcdSmoke http://127.0.0.1:2379
+./build/test/T2-EtcdPrefixOps http://127.0.0.1:2379
+./build/test/T3-EtcdPipeline http://127.0.0.1:2379</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DGALAY_ETCD_BUILD_TESTS=ON/OFF
+-DGALAY_ETCD_BUILD_BENCHMARKS=ON/OFF
+-DGALAY_ETCD_BUILD_SHARED_LIBS=ON/OFF
+-DGALAY_ETCD_ENABLE_IMPORT_COMPILATION=ON/OFF
+-DGALAY_ETCD_INSTALL_MODULE_INTERFACE=ON/OFF</code></pre>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.20+、simdjson（通过 pkg-config）、galay-kernel、galay-utils、galay-http、spdlog。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-etcd" target="_blank">https://github.com/gzj-creator/galay-etcd</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

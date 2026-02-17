@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="0; url=docs/index.html?v=20260217d">
     <title>文档 | Galay Framework</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -30,11 +31,14 @@
                 <a href="projects.html" class="nav-link">
                     <span class="nav-link-prefix">~/</span>projects
                 </a>
-                <a href="docs.html" class="nav-link active">
+                <a href="docs/index.html?v=20260217d" class="nav-link active">
                     <span class="nav-link-prefix">~/</span>docs
                 </a>
                 <a href="blog.html" class="nav-link">
                     <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
                 </a>
                 <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
                     <span class="nav-link-prefix">~/</span>github
@@ -51,15 +55,16 @@
     <div class="mobile-menu" id="mobileMenu">
         <a href="index.html" class="mobile-link">home</a>
         <a href="projects.html" class="mobile-link">projects</a>
-        <a href="docs.html" class="mobile-link active">docs</a>
+        <a href="docs/index.html?v=20260217d" class="mobile-link active">docs</a>
         <a href="blog.html" class="mobile-link">blog</a>
+        <a href="chat.html" class="mobile-link">ai</a>
         <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
     </div>
 
     <!-- Page Header -->
     <header class="page-header centered">
         <div class="container">
-            <span class="page-tag">// documentation</span>
+            <span class="page-tag">documentation</span>
             <h1 class="page-title">文档中心</h1>
             <p class="page-subtitle">从入门到精通，全面了解 Galay 框架的使用方法</p>
         </div>
@@ -103,7 +108,7 @@
                     <div class="docs-welcome">
                         <h1>欢迎使用 Galay Framework</h1>
                         <p class="docs-welcome-intro">
-                            Galay 是一个高性能的 C++20 异步网络框架，提供了协程驱动的 IO 运行时、HTTP/WebSocket 服务器、以及丰富的工具库。
+                            Galay 是一个高性能的 C++23 异步网络框架，提供了协程驱动的 IO 运行时、HTTP/WebSocket 服务器、以及丰富的工具库。
                         </p>
 
                         <div class="docs-quick-links">
@@ -186,12 +191,12 @@ int main() {
                                 <div class="docs-feature">
                                     <span class="docs-feature-icon">⚡</span>
                                     <h3>极致性能</h3>
-                                    <p>单线程 26-28 万 QPS，基于 kqueue/epoll/io_uring</p>
+                                    <p>单线程 31.3 万 QPS，基于 kqueue/epoll/io_uring</p>
                                 </div>
                                 <div class="docs-feature">
                                     <span class="docs-feature-icon">🔄</span>
                                     <h3>协程驱动</h3>
-                                    <p>基于 C++20 标准协程，代码简洁直观</p>
+                                    <p>基于 C++23 标准协程，代码简洁直观</p>
                                 </div>
                                 <div class="docs-feature">
                                     <span class="docs-feature-icon">🌍</span>
@@ -217,21 +222,27 @@ int main() {
             <div class="footer-content">
                 <div class="footer-brand">
                     <span class="footer-logo">[galay]</span>
-                    <p class="footer-tagline">High-Performance C++20 Async Runtime</p>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
                 </div>
                 <div class="footer-links">
                     <div class="footer-column">
                         <h4>项目</h4>
                         <a href="projects.html#kernel">galay-kernel</a>
+                        <a href="projects.html#ssl">galay-ssl</a>
                         <a href="projects.html#http">galay-http</a>
+                        <a href="projects.html#rpc">galay-rpc</a>
+                        <a href="projects.html#redis">galay-redis</a>
+                        <a href="projects.html#mysql">galay-mysql</a>
+                        <a href="projects.html#mongo">galay-mongo</a>
+                        <a href="projects.html#etcd">galay-etcd</a>
                         <a href="projects.html#utils">galay-utils</a>
                         <a href="projects.html#mcp">galay-mcp</a>
                     </div>
                     <div class="footer-column">
                         <h4>文档</h4>
-                        <a href="docs.html">快速开始</a>
-                        <a href="docs.html#api">API 参考</a>
-                        <a href="docs.html#examples">示例代码</a>
+                        <a href="docs/index.html?v=20260217d">快速开始</a>
+                        <a href="docs/index.html?v=20260217d">API 参考</a>
+                        <a href="docs/index.html?v=20260217d">示例代码</a>
                     </div>
                     <div class="footer-column">
                         <h4>社区</h4>
@@ -243,7 +254,7 @@ int main() {
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2024 Galay Framework. MIT License.</p>
-                <p class="footer-made">Made with <span class="heart">♥</span> and C++20</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
             </div>
         </div>
     </footer>

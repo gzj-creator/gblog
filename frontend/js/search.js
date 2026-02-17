@@ -14,6 +14,17 @@ let allData = {
     projects: []
 };
 
+const DOC_PAGE_MAP = {
+    'galay-kernel': 'docs/galay-kernel.html',
+    'galay-ssl': 'docs/galay-ssl.html',
+    'galay-http': 'docs/galay-http.html',
+    'galay-rpc': 'docs/galay-rpc.html',
+    'galay-redis': 'docs/galay-redis.html',
+    'galay-utils': 'docs/galay-utils.html',
+    'galay-mcp': 'docs/galay-mcp.html',
+    'docs-index': 'docs/index.html'
+};
+
 // 最近搜索存储 key
 const RECENT_SEARCHES_KEY = 'galay_recent_searches';
 const MAX_RECENT_SEARCHES = 5;
@@ -33,16 +44,23 @@ async function loadAllData() {
 
         if (docsRes.ok) {
             allData.docs = await docsRes.json();
+            if (Array.isArray(allData.docs)) {
+                allData.docs = allData.docs.map(doc => ({
+                    ...doc,
+                    url: doc.url || DOC_PAGE_MAP[doc.id] || doc.path || 'docs/index.html'
+                }));
+            }
         } else {
             // 使用静态数据
             allData.docs = [
-                { id: 'quick-start', title: '快速开始', description: '5 分钟内搭建你的第一个 Galay 应用', category: 'getting-started' },
-                { id: 'installation', title: '安装指南', description: '详细的安装和配置说明', category: 'getting-started' },
-                { id: 'http-server', title: 'HTTP 服务器', description: '使用 HttpServer 创建 Web 服务', category: 'guide' },
-                { id: 'http-router', title: '路由系统', description: 'HttpRouter 的使用方法和路由匹配规则', category: 'guide' },
-                { id: 'websocket', title: 'WebSocket', description: 'WebSocket 服务器和客户端的使用', category: 'guide' },
-                { id: 'coroutine', title: '协程基础', description: 'C++20 协程在 Galay 中的应用', category: 'advanced' },
-                { id: 'performance', title: '性能优化', description: '性能调优和最佳实践', category: 'advanced' }
+                { id: 'docs-index', title: '文档索引', description: '各项目文档入口与概览', category: 'docs', url: 'docs/index.html' },
+                { id: 'galay-kernel', title: 'galay-kernel', description: '协程运行时与异步 IO 基础层', category: 'docs', url: 'docs/galay-kernel.html' },
+                { id: 'galay-ssl', title: 'galay-ssl', description: 'SSL/TLS 安全传输与证书管理', category: 'docs', url: 'docs/galay-ssl.html' },
+                { id: 'galay-http', title: 'galay-http', description: 'HTTP/1.1、HTTP/2 与 WebSocket 协议栈', category: 'docs', url: 'docs/galay-http.html' },
+                { id: 'galay-rpc', title: 'galay-rpc', description: '服务间通信、注册与发现', category: 'docs', url: 'docs/galay-rpc.html' },
+                { id: 'galay-redis', title: 'galay-redis', description: '协程 Redis 客户端与 Pipeline 批处理', category: 'docs', url: 'docs/galay-redis.html' },
+                { id: 'galay-utils', title: 'galay-utils', description: '基础组件、并发与分布式工具集', category: 'docs', url: 'docs/galay-utils.html' },
+                { id: 'galay-mcp', title: 'galay-mcp', description: 'MCP 协议与 AI 工具调用', category: 'docs', url: 'docs/galay-mcp.html' }
             ];
         }
 
@@ -51,20 +69,31 @@ async function loadAllData() {
         } else {
             allData.posts = [
                 { id: 'galay-http-router', title: 'Galay-HTTP 路由系统设计与实现', excerpt: '深入解析 Galay-HTTP 的混合路由策略', date: '2024-01-20', category: 'tech' },
-                { id: 'cpp20-coroutine', title: 'C++20 协程在网络编程中的应用', excerpt: '探索如何使用 C++20 协程构建高性能异步网络库', date: '2024-01-15', category: 'tutorial' },
-                { id: 'benchmark-280k-qps', title: '如何达到 28 万 QPS：性能优化实战', excerpt: '分享 Galay-Kernel 性能优化的经验', date: '2024-01-10', category: 'performance' }
+                { id: 'cpp20-coroutine', title: 'C++23 协程在网络编程中的应用', excerpt: '探索如何使用 C++23 协程构建高性能异步网络库', date: '2024-01-15', category: 'tutorial' },
+                { id: 'coroutine-io-tuning', title: '协程 IO 调优实践', excerpt: '分享 Galay-Kernel 性能优化的经验', date: '2024-01-10', category: 'performance' }
             ];
         }
 
+        const fallbackProjects = [
+            { id: 'kernel', name: 'galay-kernel', description: 'C++23 协程网络运行时' },
+            { id: 'ssl', name: 'galay-ssl', description: '基于 galay-kernel 的异步 SSL/TLS 库' },
+            { id: 'http', name: 'galay-http', description: 'HTTP/1.1/2 与 WebSocket 协议栈' },
+            { id: 'rpc', name: 'galay-rpc', description: '异步 RPC 框架' },
+            { id: 'redis', name: 'galay-redis', description: '异步 Redis 客户端库' },
+            { id: 'utils', name: 'galay-utils', description: '现代化 C++23 工具库' },
+            { id: 'mcp', name: 'galay-mcp', description: 'MCP (Model Context Protocol) 协议库' }
+        ];
+
         if (projectsRes.ok) {
             allData.projects = await projectsRes.json();
+            const existingIds = new Set(allData.projects.map(project => project.id));
+            fallbackProjects.forEach(project => {
+                if (!existingIds.has(project.id)) {
+                    allData.projects.push(project);
+                }
+            });
         } else {
-            allData.projects = [
-                { id: 'kernel', name: 'galay-kernel', description: '高性能 C++20 协程网络库' },
-                { id: 'http', name: 'galay-http', description: '现代化高性能异步 HTTP/WebSocket 库' },
-                { id: 'utils', name: 'galay-utils', description: '现代化 C++20 工具库' },
-                { id: 'mcp', name: 'galay-mcp', description: 'MCP (Model Context Protocol) 协议库' }
-            ];
+            allData.projects = fallbackProjects;
         }
     } catch (error) {
         console.error('Error loading data:', error);
@@ -90,13 +119,14 @@ function search(query) {
             const titleMatch = doc.title.toLowerCase().includes(query);
             const descMatch = doc.description.toLowerCase().includes(query);
             if (titleMatch || descMatch) {
+                const docUrl = doc.url || DOC_PAGE_MAP[doc.id] || 'docs/index.html';
                 results.push({
                     type: 'docs',
                     typeName: '文档',
                     id: doc.id,
                     title: doc.title,
                     excerpt: doc.description,
-                    url: `docs.html#${doc.id}`,
+                    url: docUrl,
                     score: titleMatch ? 2 : 1
                 });
             }
@@ -169,7 +199,7 @@ function renderResults(results, query) {
                     <button class="search-suggestion" onclick="setSearchQuery('HTTP')">HTTP</button>
                     <button class="search-suggestion" onclick="setSearchQuery('协程')">协程</button>
                     <button class="search-suggestion" onclick="setSearchQuery('路由')">路由</button>
-                    <button class="search-suggestion" onclick="setSearchQuery('性能')">性能</button>
+                    <button class="search-suggestion" onclick="setSearchQuery('TLS')">TLS</button>
                 </div>
             </div>
         `;

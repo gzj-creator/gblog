@@ -9,11 +9,11 @@ const API_BASE = '/api';
 // Typing Animation
 // ============================================
 const typingTexts = [
-    'make -j$(nproc) && ./server',
-    'echo "280K QPS achieved!"',
-    'git clone galay-kernel',
+    'make -j$(nproc)',
+    'echo "build complete"',
+    'git clone galay-http',
     'cmake .. && make install',
-    './benchmark --connections 1000'
+    './server --port 8080'
 ];
 
 let textIndex = 0;
@@ -155,14 +155,14 @@ async function loadLatestPosts() {
             },
             {
                 id: 'cpp20-coroutine',
-                title: 'C++20 协程在网络编程中的应用',
-                excerpt: '探索如何使用 C++20 协程构建高性能异步网络库，从原理到实践的完整指南。',
+                title: 'C++23 协程在网络编程中的应用',
+                excerpt: '探索如何使用 C++23 协程构建高性能异步网络库，从原理到实践的完整指南。',
                 date: '2024-01-15',
                 categoryName: '教程'
             },
             {
-                id: 'benchmark-280k-qps',
-                title: '如何达到 28 万 QPS：性能优化实战',
+                id: 'coroutine-io-tuning',
+                title: '协程 IO 调优实践',
                 excerpt: '分享 Galay-Kernel 性能优化的经验，包括零拷贝、内存池、事件驱动等关键技术。',
                 date: '2024-01-10',
                 categoryName: '性能优化'

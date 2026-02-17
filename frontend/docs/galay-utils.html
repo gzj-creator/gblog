@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-utils 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-utils 使用文档</h1>
+            <p class="page-subtitle">提供字符串、并发、限流与一致性哈希等基础组件，采用纯头文件方式集成。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Utilities</span>
+                    <h1 class="docs-article-title">galay-utils 使用文档</h1>
+                    <p class="docs-article-description">提供字符串、并发、限流与一致性哈希等基础组件，采用纯头文件方式集成。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-utils 是 Galay 库体系的基础工具库，提供字符串、并发、限流、负载均衡等通用能力。</p>
+<p>它以头文件为主并强调可组合性，复杂业务框架与领域逻辑需在上层实现。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>Header-only 设计</strong> — 主体以头文件发布，按需引入，不强制运行时组件</li>
+<li><strong>基础能力分层</strong> — 字符串/随机/系统工具、并发原语、分布式辅助、编码组件</li>
+<li><strong>模块化导出</strong> — 支持 <code>galay.utils</code> C++23 命名模块（工具链满足时）</li>
+</ul>
+
+<h3>模块矩阵</h3>
+<table>
+<thead><tr><th>模块</th><th>头文件</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td>StringUtils</td><td>string/String.hpp</td><td>字符串分割、拼接、trim、大小写转换</td></tr>
+<tr><td>Random</td><td>random/Random.hpp</td><td>随机数与随机字符串能力</td></tr>
+<tr><td>System</td><td>system/System.hpp</td><td>系统信息、文件与环境能力</td></tr>
+<tr><td>ThreadPool</td><td>thread/Thread.hpp</td><td>固定大小线程池与任务提交</td></tr>
+<tr><td>TokenBucketLimiter</td><td>ratelimiter/RateLimiter.hpp</td><td>令牌桶/滑窗/漏桶限流实现</td></tr>
+<tr><td>CircuitBreaker</td><td>circuitbreaker/CircuitBreaker.hpp</td><td>熔断器，支持半开恢复</td></tr>
+<tr><td>LoadBalancer</td><td>balancer/LoadBalancer.hpp</td><td>轮询、加权轮询、随机、加权随机</td></tr>
+<tr><td>ConsistentHash</td><td>consistent_hash/ConsistentHash.hpp</td><td>一致性哈希路由</td></tr>
+</tbody>
+</table>
+
+<h2>核心 API</h2>
+<h3>StringUtils</h3>
+<pre><code>#include &lt;galay-utils/string/String.hpp&gt;
+
+using namespace galay::utils;
+
+// 分割与拼接
+auto parts = StringUtils::split("hello,world,cpp", ',');
+// parts: {"hello", "world", "cpp"}
+auto joined = StringUtils::join(parts, " | ");
+// joined: "hello | world | cpp"
+
+// Trim
+auto trimmed = StringUtils::trim("  hello  ");
+// trimmed: "hello"
+
+// 大小写
+auto upper = StringUtils::toUpper("hello");  // "HELLO"
+auto lower = StringUtils::toLower("HELLO");  // "hello"
+
+// 前缀/后缀判断
+bool starts = StringUtils::startsWith("hello.cpp", "hello");  // true
+bool ends = StringUtils::endsWith("hello.cpp", ".cpp");        // true
+
+// 替换
+auto replaced = StringUtils::replace("foo bar foo", "foo", "baz");
+// replaced: "baz bar baz"</code></pre>
+
+<h3>ThreadPool</h3>
+<pre><code>#include &lt;galay-utils/thread/Thread.hpp&gt;
+
+ThreadPool pool(4);  // 4 个工作线程
+
+// 提交任务，获取 future
+auto future = pool.submit([]() {
+    // 耗时计算...
+    return 42;
+});
+
+int result = future.get();  // 阻塞等待结果
+
+// 批量提交
+std::vector&lt;std::future&lt;int&gt;&gt; futures;
+for (int i = 0; i &lt; 100; i++) {
+    futures.push_back(pool.submit([i]() { return i * i; }));
+}
+
+pool.shutdown();  // 等待所有任务完成</code></pre>
+
+<h3>TokenBucketLimiter（令牌桶）</h3>
+<pre><code>#include &lt;galay-utils/ratelimiter/RateLimiter.hpp&gt;
+
+// 每秒 100 个令牌，桶容量 200（允许突发）
+TokenBucketLimiter limiter(100, 200);
+
+if (limiter.tryAcquire()) {
+    // 允许请求
+    handleRequest();
+} else {
+    // 限流，返回 429
+    return tooManyRequests();
+}
+
+// 协程等待令牌（支持 timeout）
+Coroutine throttle() {
+    auto result = co_await limiter.acquire(1).timeout(std::chrono::milliseconds(100));
+    co_return;
+}</code></pre>
+
+<h3>CircuitBreaker（熔断器）</h3>
+<pre><code>#include &lt;galay-utils/circuitbreaker/CircuitBreaker.hpp&gt;
+
+CircuitBreakerConfig config;
+config.failureThreshold = 5;
+config.successThreshold = 3;
+config.resetTimeout = std::chrono::seconds(30);
+
+CircuitBreaker breaker(config);
+
+auto result = breaker.execute([&amp;]() {
+    return callRemoteService();
+});
+
+if (!result) {
+    if (breaker.state() == CircuitState::Open) {
+        // 熔断中，走降级逻辑
+        return fallback();
+    }
+}</code></pre>
+
+<h3>LoadBalancer</h3>
+<pre><code>#include &lt;galay-utils/balancer/LoadBalancer.hpp&gt;
+
+// 轮询
+RoundRobinLoadBalancer&lt;std::string&gt; rr({
+    "192.168.1.1:8080",
+    "192.168.1.2:8080"
+});
+auto node = rr.select();
+
+// 加权轮询
+WeightRoundRobinLoadBalancer&lt;std::string&gt; wrr(
+    {"node1", "node2"}, {3, 1});
+auto weighted = wrr.select();</code></pre>
+
+<h3>示例入口</h3>
+<ul>
+<li>示例代码可参考仓库 README 的“基本使用”片段</li>
+<li>各模块文档位于 <code>docs/*.md</code>（如 <code>docs/string.md</code>、<code>docs/thread.md</code>）</li>
+</ul>
+
+<h2>构建</h2>
+<p>galay-utils 是纯头文件库，无需编译。直接 include 即可使用：</p>
+<pre><code>// CMakeLists.txt
+find_package(galay-utils REQUIRED)
+target_link_libraries(myapp PRIVATE galay::galay-utils)</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DBUILD_TESTS=ON/OFF
+-DBUILD_MODULE_TESTS=ON/OFF</code></pre>
+<p><code>BUILD_MODULE_TESTS</code> 需要 CMake &gt;= 3.28，推荐 Ninja/Visual Studio 生成器。</p>
+
+<h2>依赖</h2>
+<p>C++23 编译器与 CMake 3.16+；无第三方强依赖。</p>
+<p>Unix 平台会在接口目标上附加 <code>pthread</code>（Linux 额外 <code>dl</code>）。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-utils" target="_blank">https://github.com/gzj-creator/galay-utils</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

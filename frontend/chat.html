@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 助手 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/chat.css">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="docs/index.html?v=20260217d" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="chat.html" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="projects.html" class="mobile-link">projects</a>
+        <a href="docs/index.html?v=20260217d" class="mobile-link">docs</a>
+        <a href="blog.html" class="mobile-link">blog</a>
+        <a href="chat.html" class="mobile-link active">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <main class="chat-page">
+        <div class="chat-layout">
+            <aside class="chat-sidebar">
+                <div class="chat-sidebar-header">
+                    <div class="chat-brand">
+                        <svg class="chat-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        <div>
+                            <h2 class="chat-brand-title">Galay AI</h2>
+                            <span class="chat-brand-status">Knowledge Base</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-quick-questions">
+                    <h4 class="chat-quick-title">quick start</h4>
+                    <button class="chat-quick-btn" data-question="Galay 框架的核心特性是什么？">
+                        <span class="chat-quick-icon">&#9889;</span>
+                        核心特性
+                    </button>
+                    <button class="chat-quick-btn" data-question="如何开始使用 galay-kernel？">
+                        <span class="chat-quick-icon">&#9881;</span>
+                        Kernel 快速开始
+                    </button>
+                    <button class="chat-quick-btn" data-question="galay-http 支持哪些协议？">
+                        <span class="chat-quick-icon">&#127760;</span>
+                        HTTP 协议支持
+                    </button>
+                    <button class="chat-quick-btn" data-question="如何使用 galay-rpc 进行服务间通信？">
+                        <span class="chat-quick-icon">&#128225;</span>
+                        RPC 使用指南
+                    </button>
+                    <button class="chat-quick-btn" data-question="galay-redis 的 Pipeline 如何使用？">
+                        <span class="chat-quick-icon">&#128203;</span>
+                        Redis Pipeline
+                    </button>
+                    <button class="chat-quick-btn" data-question="协程调度器是如何工作的？">
+                        <span class="chat-quick-icon">&#128260;</span>
+                        协程调度
+                    </button>
+                </div>
+                <div class="chat-sidebar-footer">
+                    <p>基于 RAG 知识库，覆盖全部 10 个子项目文档。</p>
+                </div>
+            </aside>
+
+            <section class="chat-main">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        <div class="message-avatar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <div class="message-content">
+                            <p>你好，我是 Galay AI 助手。</p>
+                            <p>我可以回答关于 Galay 框架的问题，包括 kernel、ssl、http、rpc、redis、mysql、mongo、etcd、utils、mcp 等所有子项目。</p>
+                            <p>试试左侧的快速问题，或直接输入你的问题。</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="chat-input-container">
+                        <textarea
+                            id="chatInput"
+                            placeholder="输入关于 Galay 框架的问题..."
+                            rows="1"
+                        ></textarea>
+                        <button id="sendButton" class="chat-send-btn" aria-label="Send message">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="js/main.js"></script>
+    <script src="js/chat.js"></script>
+</body>
+</html>

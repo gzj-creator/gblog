@@ -9,6 +9,11 @@ function initCursorGlow() {
     const cursorGlow = document.getElementById('cursorGlow');
     if (!cursorGlow) return;
 
+    // Use transform instead of left/top to avoid layout thrashing
+    cursorGlow.style.left = '0px';
+    cursorGlow.style.top = '0px';
+    cursorGlow.style.willChange = 'transform';
+
     let mouseX = 0, mouseY = 0;
     let glowX = 0, glowY = 0;
 
@@ -21,8 +26,7 @@ function initCursorGlow() {
         glowX += (mouseX - glowX) * 0.1;
         glowY += (mouseY - glowY) * 0.1;
 
-        cursorGlow.style.left = glowX + 'px';
-        cursorGlow.style.top = glowY + 'px';
+        cursorGlow.style.transform = `translate(${glowX}px, ${glowY}px)`;
 
         requestAnimationFrame(animateGlow);
     }
@@ -131,13 +135,16 @@ function initNavScroll() {
     const nav = document.querySelector('.nav');
     if (!nav) return;
 
+    let scrolled = false;
     window.addEventListener('scroll', () => {
-        if (window.scrollY > 50) {
-            nav.style.background = 'rgba(10, 10, 15, 0.95)';
-        } else {
-            nav.style.background = 'rgba(10, 10, 15, 0.85)';
+        const isScrolled = window.scrollY > 50;
+        if (isScrolled !== scrolled) {
+            scrolled = isScrolled;
+            nav.style.background = scrolled
+                ? 'rgba(10, 10, 15, 0.95)'
+                : 'rgba(10, 10, 15, 0.85)';
         }
-    });
+    }, { passive: true });
 }
 
 // ============================================

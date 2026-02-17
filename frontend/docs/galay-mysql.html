@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-mysql 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-mysql 使用文档</h1>
+            <p class="page-subtitle">提供 MySQL 协议连接、查询与事务能力，支持同步/异步与预处理语句。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Database</span>
+                    <h1 class="docs-article-title">galay-mysql 使用文档</h1>
+                    <p class="docs-article-description">提供 MySQL 协议连接、查询与事务能力，支持同步/异步与预处理语句。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-mysql 是 Galay 库体系的 MySQL 客户端组件，提供同步/异步查询、预处理与事务支持。</p>
+<p>它聚焦协议连接与执行链路，SQL 设计和 ORM 抽象由业务侧决定。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>AsyncMysqlClient</strong> — 协程异步路径，使用 Awaitable 处理连接与查询</li>
+<li><strong>MysqlClient</strong> — 同步阻塞路径，便于脚本化和简单服务接入</li>
+<li><strong>MysqlResultSet</strong> — 结果集读取接口，支持行列访问</li>
+<li><strong>预处理与事务</strong> — 提供 <code>prepare/stmtExecute</code> 与 <code>beginTransaction/commit/rollback</code></li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>异步查询（example/include/E1-AsyncQuery.cc）</h3>
+<pre><code>#include "galay-mysql/async/AsyncMysqlClient.h"
+#include &lt;galay-kernel/kernel/Runtime.h&gt;
+#include &lt;expected&gt;
+#include &lt;optional&gt;
+
+using namespace galay::mysql;
+using namespace galay::kernel;
+
+Coroutine run(IOScheduler* scheduler) {
+    AsyncMysqlClient client(scheduler);
+
+    auto& conn_aw = client.connect("127.0.0.1", 3306, "root", "password", "test");
+    std::expected&lt;std::optional&lt;bool&gt;, MysqlError&gt; conn;
+    do {
+        conn = co_await conn_aw;
+        if (!conn) co_return;
+    } while (!conn-&gt;has_value());
+
+    auto& query_aw = client.query("SELECT 1");
+    std::expected&lt;std::optional&lt;MysqlResultSet&gt;, MysqlError&gt; result;
+    do {
+        result = co_await query_aw;
+        if (!result) co_return;
+    } while (!result-&gt;has_value());
+
+    co_await client.close();
+}</code></pre>
+
+<h3>同步预处理与事务（example/include/E4-SyncPreparedTx.cc）</h3>
+<pre><code>#include "galay-mysql/sync/MysqlClient.h"
+
+MysqlClient session;
+session.connect("127.0.0.1", 3306, "root", "password", "test");
+session.beginTransaction();
+
+auto prep = session.prepare("SELECT ? + ?");
+std::vector&lt;std::optional&lt;std::string&gt;&gt; params = {"3", "5"};
+auto exec = session.stmtExecute(prep-&gt;statement_id, params);
+
+session.stmtClose(prep-&gt;statement_id);
+session.commit();
+session.close();</code></pre>
+
+<h3>示例入口（与仓库一致）</h3>
+<ul>
+<li><code>E1-AsyncQuery</code> — 异步查询</li>
+<li><code>E2-SyncQuery</code> — 同步查询</li>
+<li><code>E3-AsyncPool</code> — 异步连接池</li>
+<li><code>E4-SyncPreparedTx</code> — 预处理 + 事务</li>
+<li>源码路径：<code>example/include/</code> 与 <code>example/import/</code></li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DGALAY_MYSQL_BUILD_TESTS=ON/OFF
+-DGALAY_MYSQL_BUILD_EXAMPLES=ON/OFF
+-DGALAY_MYSQL_BUILD_SHARED_LIBS=ON/OFF
+-DGALAY_MYSQL_ENABLE_IMPORT_COMPILATION=ON/OFF
+-DGALAY_MYSQL_BUILD_MODULE_EXAMPLES=ON/OFF</code></pre>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.20+、OpenSSL、spdlog、galay-kernel。</p>
+<p>运行示例/测试需要可访问的 MySQL 5.7+ / 8.0+ 实例（推荐 8.0）。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-mysql" target="_blank">https://github.com/gzj-creator/galay-mysql</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

@@ -44,7 +44,7 @@ async function loadDocs() {
             { id: 'http-router', title: '路由系统', description: 'HttpRouter 的使用方法和路由匹配规则', category: 'guide', order: 4 },
             { id: 'static-files', title: '静态文件服务', description: '配置静态文件服务和传输模式', category: 'guide', order: 5 },
             { id: 'websocket', title: 'WebSocket', description: 'WebSocket 服务器和客户端的使用', category: 'guide', order: 6 },
-            { id: 'coroutine', title: '协程基础', description: 'C++20 协程在 Galay 中的应用', category: 'advanced', order: 7 },
+            { id: 'coroutine', title: '协程基础', description: 'C++23 协程在 Galay 中的应用', category: 'advanced', order: 7 },
             { id: 'performance', title: '性能优化', description: '性能调优和最佳实践', category: 'advanced', order: 8 },
             { id: 'api-httpserver', title: 'HttpServer API', description: 'HttpServer 类的完整 API 参考', category: 'api', order: 9 },
             { id: 'api-httprouter', title: 'HttpRouter API', description: 'HttpRouter 类的完整 API 参考', category: 'api', order: 10 }
@@ -182,7 +182,7 @@ function generateDocContent(doc) {
         'quick-start': `
             <h2>环境要求</h2>
             <ul>
-                <li>C++20 兼容的编译器 (GCC 11+, Clang 14+, MSVC 19.29+)</li>
+                <li>C++23 兼容的编译器（建议使用较新版本的 GCC / Clang / MSVC）</li>
                 <li>CMake 3.20 或更高版本</li>
                 <li>macOS 10.15+ 或 Linux (内核 5.1+ 推荐使用 io_uring)</li>
             </ul>
@@ -474,8 +474,8 @@ co_await ws.ping();
         `,
 
         'coroutine': `
-            <h2>C++20 协程基础</h2>
-            <p>Galay 框架基于 C++20 标准协程实现异步编程模型。</p>
+            <h2>C++23 协程基础</h2>
+            <p>Galay 框架基于 C++23 标准协程实现异步编程模型。</p>
 
             <h2>协程类型</h2>
             <pre><code>// 基本协程类型
@@ -519,8 +519,8 @@ auto content = co_await file.readAll();</code></pre>
 
             <h2>基准测试结果</h2>
             <ul>
-                <li>单线程 QPS：26-28 万</li>
-                <li>吞吐量：130+ MB/s</li>
+                <li>单线程 QPS：31.3 万</li>
+                <li>吞吐量：153.24 MB/s</li>
                 <li>延迟：P99 &lt; 1ms</li>
             </ul>
 

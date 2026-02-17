@@ -117,8 +117,8 @@ kubectl get pods -l app=blog-server
 ## 性能指标
 
 基于 galay-kernel 的高性能特性：
-- **QPS**: 280,000+
-- **吞吐量**: 130+ MB/s
+- **QPS**: 313,841
+- **吞吐量**: 153.24 MB/s
 - **延迟 P99**: < 1ms
 
 ## 相关项目

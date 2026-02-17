@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Galay Framework | High-Performance C++20 Async Runtime</title>
+    <title>Galay Framework | Modern C++23 Async Runtime</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/components.css">
-    <link rel="stylesheet" href="css/home.css">
+    <link rel="stylesheet" href="css/home.css?v=202602170930">
 </head>
 <body>
     <!-- Scanline overlay -->
@@ -33,11 +33,14 @@
                 <a href="projects.html" class="nav-link">
                     <span class="nav-link-prefix">~/</span>projects
                 </a>
-                <a href="docs.html" class="nav-link">
+                <a href="docs/index.html?v=20260217d" class="nav-link">
                     <span class="nav-link-prefix">~/</span>docs
                 </a>
                 <a href="blog.html" class="nav-link">
                     <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
                 </a>
                 <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
                     <span class="nav-link-prefix">~/</span>github
@@ -55,8 +58,9 @@
     <div class="mobile-menu" id="mobileMenu">
         <a href="index.html" class="mobile-link active">home</a>
         <a href="projects.html" class="mobile-link">projects</a>
-        <a href="docs.html" class="mobile-link">docs</a>
+        <a href="docs/index.html?v=20260217d" class="mobile-link">docs</a>
         <a href="blog.html" class="mobile-link">blog</a>
+        <a href="chat.html" class="mobile-link">ai</a>
         <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
     </div>
 
@@ -82,35 +86,34 @@
             </div>
 
             <h1 class="hero-title">
-                <span class="title-line">High-Performance</span>
-                <span class="title-line accent">C++20 Async Runtime</span>
+                <span class="title-line">C++23</span>
+                <span class="title-line accent">Async Framework</span>
             </h1>
 
             <p class="hero-subtitle">
-                构建下一代网络应用的基础设施<br>
-                <span class="highlight">280K+ QPS</span> · <span class="highlight">零拷贝</span> · <span class="highlight">协程驱动</span>
+                覆盖客户端与服务端的 C++23 网络开发能力<br>
+                <span class="highlight">协程运行时</span> · <span class="highlight">协议通信</span> · <span class="highlight">数据客户端与工具扩展</span>
             </p>
 
             <div class="hero-stats">
                 <div class="stat">
-                    <span class="stat-value" data-target="280000">0</span>
-                    <span class="stat-label">QPS</span>
+                    <span class="stat-value">Runtime</span>
+                    <span class="stat-label">调度、IO、定时器与并发原语</span>
                 </div>
                 <div class="stat-divider"></div>
                 <div class="stat">
-                    <span class="stat-value" data-target="130">0</span>
-                    <span class="stat-unit">MB/s</span>
-                    <span class="stat-label">吞吐量</span>
+                    <span class="stat-value">Protocol</span>
+                    <span class="stat-label">HTTP/1.1·HTTP/2·WebSocket·RPC·TLS·MCP</span>
                 </div>
                 <div class="stat-divider"></div>
                 <div class="stat">
-                    <span class="stat-value">C++20</span>
-                    <span class="stat-label">标准</span>
+                    <span class="stat-value">Libraries</span>
+                    <span class="stat-label">Redis·MySQL·Mongo·Etcd·Utils</span>
                 </div>
             </div>
 
             <div class="hero-actions">
-                <a href="docs.html" class="btn btn-primary">
+                <a href="docs/index.html?v=20260217d" class="btn btn-primary">
                     <span class="btn-text">快速开始</span>
                     <span class="btn-icon">→</span>
                 </a>
@@ -129,22 +132,27 @@
     <section class="features" id="features">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">// features</span>
+                <span class="section-tag">features</span>
                 <h2 class="section-title">核心特性</h2>
             </div>
 
             <div class="features-grid">
-                <div class="feature-card large">
+                <div class="feature-card">
                     <div class="feature-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
-                    <h3>极致性能</h3>
-                    <p>单线程 26-28万 QPS，130+ MB/s 吞吐量。基于 kqueue/epoll/io_uring 的高效事件驱动。</p>
+                    <h3>运行时与安全基座</h3>
+                    <p>kernel + ssl + utils 提供协程调度、异步 IO、TLS 安全传输与通用组件，作为全套库统一基座。</p>
                     <div class="feature-stats">
-                        <span><strong>280K</strong> QPS</span>
-                        <span><strong>130+</strong> MB/s</span>
+                        <span><strong>协程调度</strong></span>
+                        <span><strong>异步 IO</strong></span>
+                        <span><strong>事件循环</strong></span>
+                        <span><strong>kqueue</strong></span>
+                        <span><strong>epoll</strong></span>
+                        <span><strong>io_uring</strong></span>
+                        <span><strong>TLS 1.2/1.3</strong></span>
                     </div>
                 </div>
 
@@ -154,8 +162,15 @@
                             <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                         </svg>
                     </div>
-                    <h3>协程驱动</h3>
-                    <p>基于 C++20 标准协程，用同步的方式编写异步代码，简洁直观。</p>
+                    <h3>协议与服务通信</h3>
+                    <p>覆盖 HTTP/1.1、HTTP/2、WebSocket 与 RPC 能力，支持路由、静态文件、连接升级与服务间调用。</p>
+                    <div class="feature-stats">
+                        <span><strong>HTTP/1.1</strong></span>
+                        <span><strong>HTTP/2</strong></span>
+                        <span><strong>WebSocket</strong></span>
+                        <span><strong>RPC</strong></span>
+                        <span><strong>Route / Static</strong></span>
+                    </div>
                 </div>
 
                 <div class="feature-card">
@@ -164,8 +179,16 @@
                             <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
                         </svg>
                     </div>
-                    <h3>跨平台</h3>
-                    <p>支持 macOS (kqueue)、Linux (epoll/io_uring)，一套代码多平台运行。</p>
+                    <h3>数据客户端能力</h3>
+                    <p>提供 Redis、MySQL、Mongo、etcd 客户端，支持同步/异步调用、认证、事务与批量管线操作。</p>
+                    <div class="feature-stats">
+                        <span><strong>Redis</strong></span>
+                        <span><strong>MySQL</strong></span>
+                        <span><strong>MongoDB</strong></span>
+                        <span><strong>etcd</strong></span>
+                        <span><strong>Sync / Async</strong></span>
+                        <span><strong>Pipeline</strong></span>
+                    </div>
                 </div>
 
                 <div class="feature-card">
@@ -174,8 +197,14 @@
                             <path d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
                     </div>
-                    <h3>零拷贝</h3>
-                    <p>高效的 Bytes 数据容器，sendfile 系统调用实现零拷贝文件传输。</p>
+                    <h3>客户端/服务端同构</h3>
+                    <p>同一套编程模型可覆盖客户端与服务端，支持同步/异步并存，便于跨项目复用和演进。</p>
+                    <div class="feature-stats">
+                        <span><strong>Client</strong></span>
+                        <span><strong>Server</strong></span>
+                        <span><strong>Sync / Async</strong></span>
+                        <span><strong>macOS / Linux</strong></span>
+                    </div>
                 </div>
 
                 <div class="feature-card">
@@ -184,112 +213,34 @@
                             <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                         </svg>
                     </div>
-                    <h3>模块化</h3>
-                    <p>kernel、http、utils、mcp 独立模块，按需引入，灵活组合。</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Quick Start Section -->
-    <section class="quickstart">
-        <div class="container">
-            <div class="section-header">
-                <span class="section-tag">// quick start</span>
-                <h2 class="section-title">快速开始</h2>
-            </div>
-
-            <div class="quickstart-content">
-                <div class="quickstart-steps">
-                    <div class="step">
-                        <span class="step-number">01</span>
-                        <div class="step-content">
-                            <h4>安装依赖</h4>
-                            <p>确保你有 C++20 编译器和 CMake 3.16+</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-number">02</span>
-                        <div class="step-content">
-                            <h4>克隆仓库</h4>
-                            <p>获取 galay-kernel 和 galay-http 源码</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-number">03</span>
-                        <div class="step-content">
-                            <h4>编译安装</h4>
-                            <p>使用 CMake 构建并安装到系统</p>
-                        </div>
-                    </div>
-                    <div class="step">
-                        <span class="step-number">04</span>
-                        <div class="step-content">
-                            <h4>开始使用</h4>
-                            <p>在你的项目中引入 galay 库</p>
-                        </div>
+                    <h3>AI 协议接入</h3>
+                    <p>支持 MCP 协议（stdio/HTTP、JSON-RPC），用于工具注册与 AI 应用侧能力暴露。</p>
+                    <div class="feature-stats">
+                        <span><strong>MCP</strong></span>
+                        <span><strong>stdio</strong></span>
+                        <span><strong>HTTP</strong></span>
+                        <span><strong>JSON-RPC</strong></span>
+                        <span><strong>工具注册</strong></span>
                     </div>
                 </div>
 
-                <div class="quickstart-code">
-                    <div class="code-window">
-                        <div class="code-header">
-                            <div class="code-tabs">
-                                <button class="code-tab active" data-tab="install">安装</button>
-                                <button class="code-tab" data-tab="example">示例</button>
-                            </div>
-                            <button class="code-copy" onclick="copyCode(this)">复制</button>
-                        </div>
-                        <pre class="code-content" id="codeInstall"><code><span class="comment"># 克隆仓库</span>
-git clone https://github.com/gzj-creator/galay-kernel.git
-git clone https://github.com/gzj-creator/galay-http.git
-
-<span class="comment"># 编译 galay-kernel</span>
-<span class="keyword">cd</span> galay-kernel
-mkdir build && <span class="keyword">cd</span> build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j<span class="function">$(</span>nproc<span class="function">)</span>
-sudo make install
-
-<span class="comment"># 编译 galay-http</span>
-<span class="keyword">cd</span> ../../galay-http
-mkdir build && <span class="keyword">cd</span> build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j<span class="function">$(</span>nproc<span class="function">)</span>
-sudo make install</code></pre>
-                        <pre class="code-content hidden" id="codeExample"><code><span class="keyword">#include</span> <span class="string">"galay-http/kernel/http/HttpServer.h"</span>
-<span class="keyword">#include</span> <span class="string">"galay-http/kernel/http/HttpRouter.h"</span>
-
-<span class="keyword">using namespace</span> galay::http;
-
-<span class="type">Coroutine</span> <span class="function">helloHandler</span>(HttpConn& conn, HttpRequest req) {
-    <span class="keyword">auto</span> response = Http1_1ResponseBuilder::ok()
-        .text(<span class="string">"Hello, Galay!"</span>)
-        .build();
-
-    <span class="keyword">auto</span> writer = conn.getWriter();
-    <span class="keyword">while</span> (<span class="keyword">true</span>) {
-        <span class="keyword">auto</span> result = <span class="keyword">co_await</span> writer.sendResponse(response);
-        <span class="keyword">if</span> (!result || result.value()) <span class="keyword">break</span>;
-    }
-}
-
-<span class="type">int</span> <span class="function">main</span>() {
-    HttpRouter router;
-    router.addHandler&lt;HttpMethod::GET&gt;(<span class="string">"/"</span>, helloHandler);
-
-    HttpServer server({<span class="string">"0.0.0.0"</span>, <span class="number">8080</span>});
-    server.start(std::move(router));
-}</code></pre>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9 12h6m-6 4h6M9 8h6M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+                        </svg>
+                    </div>
+                    <h3>构建与接入路径</h3>
+                    <p>支持 CMake 工程化接入，提供 include 与 C++23 import/module 双路径，便于不同工具链下平滑落地。</p>
+                    <div class="feature-stats">
+                        <span><strong>CMake</strong></span>
+                        <span><strong>include</strong></span>
+                        <span><strong>import</strong></span>
+                        <span><strong>module</strong></span>
+                        <span><strong>examples</strong></span>
+                        <span><strong>tests</strong></span>
                     </div>
                 </div>
-            </div>
-
-            <div class="quickstart-cta">
-                <a href="docs.html" class="btn btn-primary">
-                    <span class="btn-text">查看完整文档</span>
-                    <span class="btn-icon">→</span>
-                </a>
             </div>
         </div>
     </section>
@@ -298,91 +249,86 @@ sudo make install</code></pre>
     <section class="projects-preview">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">// ecosystem</span>
+                <span class="section-tag">ecosystem</span>
                 <h2 class="section-title">项目生态</h2>
+                <p class="section-intro">Galay 不是单体框架，而是可组合的 C++23 库集合。能力覆盖运行时、协议服务、数据客户端与工具扩展，支持客户端和服务端双向场景。</p>
+                <div class="ecosystem-module-note">
+                    <h3>C++23 模块编译支持</h3>
+                    <p>galay-* 系列库均提供命名模块接口，支持 <code>import galay.xxx;</code>。可按工具链选择 module/import 或传统 include，两条路径保持一致 API。</p>
+                    <pre><code>import galay.kernel;
+import galay.http;
+import galay.mysql;
+import galay.mcp;</code></pre>
+                </div>
             </div>
 
-            <div class="projects-grid">
-                <article class="project-card" data-project="kernel">
-                    <div class="project-card-glow"></div>
-                    <div class="project-card-content">
-                        <div class="project-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <circle cx="12" cy="12" r="3"/>
-                                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
-                            </svg>
+            <div class="projects-preview-layout">
+                <div class="ecosystem-groups">
+                    <article class="ecosystem-group ecosystem-group-core">
+                        <span class="ecosystem-group-label">Architecture</span>
+                        <h3 class="ecosystem-group-title">能力分层</h3>
+                        <p class="ecosystem-group-desc">将运行时、安全传输、协议、数据与工具拆分为独立层，边界清晰，便于扩展与维护。</p>
+                        <div class="ecosystem-library-list">
+                            <span class="ecosystem-library-item">运行时层</span>
+                            <span class="ecosystem-library-item">安全层</span>
+                            <span class="ecosystem-library-item">协议层</span>
+                            <span class="ecosystem-library-item">数据层</span>
+                            <span class="ecosystem-library-item">工具层</span>
                         </div>
-                        <h3 class="project-name">galay-kernel</h3>
-                        <p class="project-desc">高性能 C++20 协程网络库，基于 kqueue/epoll/io_uring 实现异步 IO</p>
-                        <div class="project-tags">
-                            <span class="tag">Core</span>
-                            <span class="tag">C++20</span>
-                        </div>
-                        <a href="projects.html#kernel" class="project-link">
-                            了解更多 <span>→</span>
-                        </a>
-                    </div>
-                </article>
+                    </article>
 
-                <article class="project-card" data-project="http">
-                    <div class="project-card-glow"></div>
-                    <div class="project-card-content">
-                        <div class="project-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
-                            </svg>
+                    <article class="ecosystem-group ecosystem-group-ssl">
+                        <span class="ecosystem-group-label">Usage Model</span>
+                        <h3 class="ecosystem-group-title">接入路径</h3>
+                        <p class="ecosystem-group-desc">支持单库最小接入、逐步扩展组合，客户端与服务端都可按场景独立演进。</p>
+                        <div class="ecosystem-library-list">
+                            <span class="ecosystem-library-item">单库起步</span>
+                            <span class="ecosystem-library-item">渐进扩展</span>
+                            <span class="ecosystem-library-item">同步/异步并存</span>
                         </div>
-                        <h3 class="project-name">galay-http</h3>
-                        <p class="project-desc">现代化高性能异步 HTTP/WebSocket 库，内置路由系统和静态文件服务</p>
-                        <div class="project-tags">
-                            <span class="tag">Protocol</span>
-                            <span class="tag">HTTP</span>
-                        </div>
-                        <a href="projects.html#http" class="project-link">
-                            了解更多 <span>→</span>
-                        </a>
-                    </div>
-                </article>
+                    </article>
 
-                <article class="project-card" data-project="utils">
-                    <div class="project-card-glow"></div>
-                    <div class="project-card-content">
-                        <div class="project-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
-                            </svg>
+                    <article class="ecosystem-group ecosystem-group-others">
+                        <span class="ecosystem-group-label">Library Set</span>
+                        <h3 class="ecosystem-group-title">模块导航</h3>
+                        <p class="ecosystem-group-desc">按功能分组快速跳转到项目与文档，便于评估、选型、验证与落地。</p>
+                        <div class="ecosystem-library-groups">
+                            <section class="ecosystem-library-group">
+                                <h4 class="ecosystem-library-group-title">基础与安全</h4>
+                                <div class="ecosystem-library-list">
+                                    <a class="ecosystem-library-item" href="projects.html#kernel">galay-kernel</a>
+                                    <a class="ecosystem-library-item" href="projects.html#ssl">galay-ssl</a>
+                                </div>
+                            </section>
+                            <section class="ecosystem-library-group">
+                                <h4 class="ecosystem-library-group-title">协议与通信</h4>
+                                <div class="ecosystem-library-list">
+                                    <a class="ecosystem-library-item" href="projects.html#http">galay-http</a>
+                                    <a class="ecosystem-library-item" href="projects.html#rpc">galay-rpc</a>
+                                </div>
+                            </section>
+                            <section class="ecosystem-library-group">
+                                <h4 class="ecosystem-library-group-title">数据客户端</h4>
+                                <div class="ecosystem-library-list">
+                                    <a class="ecosystem-library-item" href="projects.html#redis">galay-redis</a>
+                                    <a class="ecosystem-library-item" href="projects.html#mysql">galay-mysql</a>
+                                    <a class="ecosystem-library-item" href="projects.html#mongo">galay-mongo</a>
+                                    <a class="ecosystem-library-item" href="projects.html#etcd">galay-etcd</a>
+                                </div>
+                            </section>
+                            <section class="ecosystem-library-group">
+                                <h4 class="ecosystem-library-group-title">工具扩展</h4>
+                                <div class="ecosystem-library-list">
+                                    <a class="ecosystem-library-item" href="projects.html#utils">galay-utils</a>
+                                    <a class="ecosystem-library-item" href="projects.html#mcp">galay-mcp</a>
+                                </div>
+                            </section>
                         </div>
-                        <h3 class="project-name">galay-utils</h3>
-                        <p class="project-desc">现代化 C++20 工具库，提供线程池、一致性哈希、熔断器等功能</p>
-                        <div class="project-tags">
-                            <span class="tag">Utils</span>
-                            <span class="tag">Header-only</span>
+                        <div class="ecosystem-group-links">
+                            <a href="projects.html" class="ecosystem-link">查看全部</a>
                         </div>
-                        <a href="projects.html#utils" class="project-link">
-                            了解更多 <span>→</span>
-                        </a>
-                    </div>
-                </article>
-
-                <article class="project-card" data-project="mcp">
-                    <div class="project-card-glow"></div>
-                    <div class="project-card-content">
-                        <div class="project-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                            </svg>
-                        </div>
-                        <h3 class="project-name">galay-mcp</h3>
-                        <p class="project-desc">MCP (Model Context Protocol) 协议库，支持 AI 工具调用</p>
-                        <div class="project-tags">
-                            <span class="tag">AI</span>
-                            <span class="tag">JSON-RPC</span>
-                        </div>
-                        <a href="projects.html#mcp" class="project-link">
-                            了解更多 <span>→</span>
-                        </a>
-                    </div>
-                </article>
+                    </article>
+                </div>
             </div>
 
             <div class="projects-cta">
@@ -398,7 +344,7 @@ sudo make install</code></pre>
     <section class="latest-posts">
         <div class="container">
             <div class="section-header">
-                <span class="section-tag">// blog</span>
+                <span class="section-tag">blog</span>
                 <h2 class="section-title">最新文章</h2>
             </div>
 
@@ -421,21 +367,27 @@ sudo make install</code></pre>
             <div class="footer-content">
                 <div class="footer-brand">
                     <span class="footer-logo">[galay]</span>
-                    <p class="footer-tagline">High-Performance C++20 Async Runtime</p>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
                 </div>
                 <div class="footer-links">
                     <div class="footer-column">
                         <h4>项目</h4>
                         <a href="projects.html#kernel">galay-kernel</a>
+                        <a href="projects.html#ssl">galay-ssl</a>
                         <a href="projects.html#http">galay-http</a>
+                        <a href="projects.html#rpc">galay-rpc</a>
+                        <a href="projects.html#redis">galay-redis</a>
+                        <a href="projects.html#mysql">galay-mysql</a>
+                        <a href="projects.html#mongo">galay-mongo</a>
+                        <a href="projects.html#etcd">galay-etcd</a>
                         <a href="projects.html#utils">galay-utils</a>
                         <a href="projects.html#mcp">galay-mcp</a>
                     </div>
                     <div class="footer-column">
                         <h4>文档</h4>
-                        <a href="docs.html">快速开始</a>
-                        <a href="docs.html#api">API 参考</a>
-                        <a href="docs.html#examples">示例代码</a>
+                        <a href="docs/index.html?v=20260217d">快速开始</a>
+                        <a href="docs/index.html?v=20260217d">API 参考</a>
+                        <a href="docs/index.html?v=20260217d">示例代码</a>
                     </div>
                     <div class="footer-column">
                         <h4>社区</h4>
@@ -447,7 +399,7 @@ sudo make install</code></pre>
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2024 Galay Framework. MIT License.</p>
-                <p class="footer-made">Made with <span class="heart">♥</span> and C++20</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
             </div>
         </div>
     </footer>

@@ -87,7 +87,7 @@ function generatePlaceholderContent(article) {
         <p>本文将深入探讨 ${article.title} 的相关内容。作为 Galay 框架系列文章的一部分，我们将从原理到实践，全面解析这一主题。</p>
 
         <blockquote>
-            <p>Galay 框架致力于提供高性能、易用的 C++20 异步编程解决方案。</p>
+            <p>Galay 框架致力于提供高性能、易用的 C++23 异步编程解决方案。</p>
         </blockquote>
 
         <h2>核心要点</h2>

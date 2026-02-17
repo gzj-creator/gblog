@@ -39,7 +39,7 @@ Coroutine getProjectsHandler(HttpConn& conn, HttpRequest req) {
             {"id", "kernel"},
             {"name", "galay-kernel"},
             {"description", "高性能 C++20 协程网络库，基于 kqueue/epoll/io_uring 实现异步 IO"},
-            {"features", json::array({"280K QPS", "130+ MB/s", "跨平台", "零拷贝"})},
+            {"features", json::array({"313K QPS", "153 MB/s", "跨平台", "零拷贝"})},
             {"language", "C++20"},
             {"license", "MIT"}
         },
@@ -76,7 +76,10 @@ Coroutine getProjectsHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -89,7 +92,7 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             {"name", "galay-kernel"},
             {"description", "高性能 C++20 协程网络库，基于 kqueue/epoll/io_uring 实现异步 IO"},
             {"longDescription", "galay-kernel 是整个 Galay 框架的核心，提供了基于 C++20 协程的高性能异步 IO 运行时。它在 macOS 上使用 kqueue，在 Linux 上支持 epoll 和 io_uring，实现了真正的跨平台异步编程。"},
-            {"features", json::array({"极致性能：单线程 26-28万 QPS", "协程驱动：基于 C++20 标准协程", "跨平台：支持 macOS/Linux", "异步文件 IO"})},
+            {"features", json::array({"极致性能：单线程 31.3 万 QPS", "协程驱动：基于 C++20 标准协程", "跨平台：支持 macOS/Linux", "异步文件 IO"})},
             {"benchmarks", {
                 {"qps_100", 279569},
                 {"qps_500", 275722},
@@ -147,7 +150,10 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
             .header("Access-Control-Allow-Origin", "*")
             .json(R"({"error": "Project not found"})")
             .build();
-        co_await writer.sendResponse(response);
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
         co_return;
     }
 
@@ -157,7 +163,10 @@ Coroutine getProjectHandler(HttpConn& conn, HttpRequest req, const std::string& 
         .json(it->second.dump())
         .build();
 
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -175,7 +184,10 @@ Coroutine healthHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 

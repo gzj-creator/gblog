@@ -85,7 +85,7 @@ static std::map<std::string, ProjectInfo> g_projects = {
         "galay-kernel",
         "高性能 C++20 协程网络库，基于 kqueue/epoll/io_uring 实现异步 IO",
         "galay-kernel 是整个 Galay 框架的核心，提供了基于 C++20 协程的高性能异步 IO 运行时。",
-        {"极致性能：单线程 26-28万 QPS", "协程驱动：基于 C++20 标准协程", "跨平台：支持 macOS/Linux", "异步文件 IO"},
+        {"极致性能：单线程 31.3 万 QPS", "协程驱动：基于 C++20 标准协程", "跨平台：支持 macOS/Linux", "异步文件 IO"},
         "C++20",
         "MIT",
         "https://github.com/gzj-creator/galay-kernel"
@@ -148,8 +148,8 @@ static std::vector<BlogPost> g_posts = {
         false
     },
     {
-        "benchmark-280k-qps",
-        "如何达到 28 万 QPS：性能优化实战",
+        "coroutine-io-tuning",
+        "协程 IO 调优实践",
         "分享 Galay-Kernel 性能优化的经验，包括零拷贝、内存池、事件驱动等关键技术。",
         "",
         "2024-01-10",
@@ -359,7 +359,10 @@ Coroutine healthHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -376,7 +379,10 @@ Coroutine getProjectsHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -402,7 +408,10 @@ Coroutine getProjectByIdHandler(HttpConn& conn, HttpRequest req) {
             .header("Access-Control-Allow-Origin", "*")
             .json(R"({"error":"Project not found"})")
             .build();
-        co_await writer.sendResponse(response);
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
         co_return;
     }
 
@@ -414,7 +423,10 @@ Coroutine getProjectByIdHandler(HttpConn& conn, HttpRequest req) {
         .json(body)
         .build();
 
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -431,7 +443,10 @@ Coroutine getPostsHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -465,7 +480,10 @@ Coroutine getPostByIdHandler(HttpConn& conn, HttpRequest req) {
             .header("Access-Control-Allow-Origin", "*")
             .json(R"({"error":"Post not found"})")
             .build();
-        co_await writer.sendResponse(response);
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
         co_return;
     }
 
@@ -477,7 +495,10 @@ Coroutine getPostByIdHandler(HttpConn& conn, HttpRequest req) {
         .json(body)
         .build();
 
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -494,7 +515,10 @@ Coroutine getDocsHandler(HttpConn& conn, HttpRequest req) {
         .build();
 
     auto writer = conn.getWriter();
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 
@@ -528,7 +552,10 @@ Coroutine getDocByIdHandler(HttpConn& conn, HttpRequest req) {
             .header("Access-Control-Allow-Origin", "*")
             .json(R"({"error":"Document not found"})")
             .build();
-        co_await writer.sendResponse(response);
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
         co_return;
     }
 
@@ -540,7 +567,10 @@ Coroutine getDocByIdHandler(HttpConn& conn, HttpRequest req) {
         .json(body)
         .build();
 
-    co_await writer.sendResponse(response);
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
     co_return;
 }
 

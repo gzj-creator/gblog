@@ -1,0 +1,6 @@
+# One directory per line. Lines starting with # are ignored.
+# You can use absolute paths or paths relative to this file.
+
+/path/to/repos/galay-kernel
+/path/to/repos/galay-http
+/path/to/repos/galay-rpc

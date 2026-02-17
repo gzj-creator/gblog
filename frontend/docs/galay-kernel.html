@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-kernel 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-kernel 使用文档</h1>
+            <p class="page-subtitle">提供协程调度与跨平台异步 IO 能力，作为 Galay 全栈组件的运行时底座。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Runtime</span>
+                    <h1 class="docs-article-title">galay-kernel 使用文档</h1>
+                    <p class="docs-article-description">提供协程调度与跨平台异步 IO 能力，作为 Galay 全栈组件的运行时底座。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-kernel 是 Galay 库体系的运行时基座，提供协程调度、事件循环与跨平台异步 IO 能力。</p>
+<p>它面向执行层性能与并发模型，不负责上层协议语义和业务编排。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>Runtime</strong> — 管理 IO/Compute 调度器生命周期，并通过 <code>getNextIOScheduler()</code> 分配协程执行位点</li>
+<li><strong>Coroutine / Awaitable</strong> — 统一 <code>co_await</code> 异步风格，覆盖网络、文件、同步原语与定时器</li>
+<li><strong>Scheduler</strong> — IO 调度与计算调度解耦，支持多调度器并行</li>
+<li><strong>多后端 IO</strong> — macOS 使用 <code>kqueue</code>；Linux 在 <code>epoll/io_uring</code> 间按配置选择</li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>最小示例（example/include/E4-CoroutineBasic.cc）</h3>
+<pre><code>#include "galay-kernel/kernel/Coroutine.h"
+#include "galay-kernel/kernel/ComputeScheduler.h"
+
+using namespace galay::kernel;
+
+Coroutine simpleTask(int id) {
+    // 业务逻辑
+    co_return;
+}
+
+int main() {
+    ComputeScheduler scheduler;
+    scheduler.start();
+    scheduler.spawn(simpleTask(1));
+    scheduler.stop();
+    return 0;
+}</code></pre>
+
+<h3>示例入口（与仓库一致）</h3>
+<ul>
+<li><code>E1-SendfileExample</code> — <code>example/include/E1-SendfileExample.cc</code></li>
+<li><code>E2-TcpEchoServer</code> — <code>example/include/E2-TcpEchoServer.cc</code></li>
+<li><code>E3-TcpClient</code> — <code>example/include/E3-TcpClient.cc</code></li>
+<li><code>E4-CoroutineBasic</code> — <code>example/include/E4-CoroutineBasic.cc</code></li>
+<li><code>E5-UdpEcho</code> — <code>example/include/E5-UdpEcho.cc</code></li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DBUILD_TESTS=ON/OFF
+-DBUILD_BENCHMARKS=ON/OFF
+-DBUILD_EXAMPLES=ON/OFF
+-DBUILD_SHARED_LIBS=ON/OFF
+-DENABLE_LOG=ON/OFF
+-DDISABLE_IOURING=ON/OFF
+-DENABLE_CPP23_MODULES=ON/OFF</code></pre>
+<p><code>ENABLE_CPP23_MODULES</code> 需要 CMake &gt;= 3.28，并建议使用 Ninja/Visual Studio 生成器；不满足条件会被禁用。</p>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.16+。日志开启时使用 spdlog。</p>
+<p>Linux 下按 IO 后端需要 <code>libaio</code>（epoll 文件 IO）或 <code>liburing</code>（io_uring）。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-kernel" target="_blank">https://github.com/gzj-creator/galay-kernel</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

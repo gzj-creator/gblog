@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-ssl 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-ssl 使用文档</h1>
+            <p class="page-subtitle">提供异步 TLS 握手与加密收发能力，作为 HTTPS 与加密 RPC 的安全传输层。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Security</span>
+                    <h1 class="docs-article-title">galay-ssl 使用文档</h1>
+                    <p class="docs-article-description">提供异步 TLS 握手与加密收发能力，作为 HTTPS 与加密 RPC 的安全传输层。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-ssl 是 Galay 库体系的 TLS 传输层，提供异步握手、加密收发与证书校验能力。</p>
+<p>它专注链路安全与兼容性，HTTP/RPC 等协议语义仍由上层库承担。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>SslContext</strong> — 负责证书、私钥、TLS 方法与校验策略等上下文配置</li>
+<li><strong>SslSocket</strong> — 异步 TLS 套接字，封装 <code>connect/handshake/recv/send/shutdown/close</code></li>
+<li><strong>Memory BIO 管线</strong> — 将 TLS 状态机与网络 IO 解耦，便于与协程调度器协同</li>
+<li><strong>多后端调度</strong> — 随平台使用 <code>kqueue</code> / <code>epoll</code> / <code>io_uring</code></li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>最小 TLS Echo 服务端（examples/include/E1-SslEchoServer.cc）</h3>
+<pre><code>#include "galay-ssl/async/SslSocket.h"
+#include "galay-ssl/ssl/SslContext.h"
+#include &lt;galay-kernel/kernel/Coroutine.h&gt;
+#include &lt;atomic&gt;
+#include &lt;chrono&gt;
+#include &lt;csignal&gt;
+#include &lt;string&gt;
+#include &lt;thread&gt;
+
+#ifdef USE_KQUEUE
+#include &lt;galay-kernel/kernel/KqueueScheduler.h&gt;
+using IOSchedulerType = galay::kernel::KqueueScheduler;
+#elif defined(USE_EPOLL)
+#include &lt;galay-kernel/kernel/EpollScheduler.h&gt;
+using IOSchedulerType = galay::kernel::EpollScheduler;
+#elif defined(USE_IOURING)
+#include &lt;galay-kernel/kernel/IOUringScheduler.h&gt;
+using IOSchedulerType = galay::kernel::IOUringScheduler;
+#endif
+
+using namespace galay::ssl;
+using namespace galay::kernel;
+
+std::atomic&lt;bool&gt; g_running{true};
+
+void signalHandler(int) { g_running = false; }
+
+Coroutine handleClient(SslContext* ctx, GHandle handle) {
+    SslSocket client(ctx, handle);
+    client.option().handleNonBlock();
+
+    while (!client.isHandshakeCompleted()) {
+        auto hs = co_await client.handshake();
+        if (!hs) {
+            co_await client.close();
+            co_return;
+        }
+    }
+
+    char buffer[4096];
+    auto recvResult = co_await client.recv(buffer, sizeof(buffer));
+    if (recvResult &amp;&amp; recvResult.value().size() &gt; 0) {
+        auto&amp; bytes = recvResult.value();
+        co_await client.send(reinterpret_cast&lt;const char*&gt;(bytes.data()), bytes.size());
+    }
+
+    co_await client.shutdown();
+    co_await client.close();
+}
+
+Coroutine sslEchoServer(IOSchedulerType* scheduler, SslContext* ctx, uint16_t port) {
+    SslSocket listener(ctx);
+    listener.option().handleReuseAddr();
+    listener.option().handleNonBlock();
+
+    if (!listener.bind(Host(IPType::IPV4, "0.0.0.0", port))) co_return;
+    if (!listener.listen(128)) co_return;
+
+    while (g_running) {
+        Host clientHost;
+        auto accepted = co_await listener.accept(&amp;clientHost);
+        if (accepted) {
+            scheduler-&gt;spawn(handleClient(ctx, accepted.value()));
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
+    if (argc &lt; 4) return 1;
+
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+    signal(SIGPIPE, SIG_IGN);
+
+    uint16_t port = static_cast&lt;uint16_t&gt;(std::stoi(argv[1]));
+    SslContext ctx(SslMethod::TLS_Server);
+    if (!ctx.isValid()) return 1;
+    if (!ctx.loadCertificate(argv[2])) return 1;
+    if (!ctx.loadPrivateKey(argv[3])) return 1;
+
+    IOSchedulerType scheduler;
+    scheduler.start();
+    scheduler.spawn(sslEchoServer(&amp;scheduler, &amp;ctx, port));
+
+    while (g_running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+    scheduler.stop();
+    return 0;
+}</code></pre>
+
+<h3>示例入口（与仓库一致）</h3>
+<ul>
+<li><code>E1-SslEchoServer-Include</code> — <code>examples/include/E1-SslEchoServer.cc</code></li>
+<li><code>E2-SslClient-Include</code> — <code>examples/include/E2-SslClient.cc</code></li>
+<li><code>E1-SslEchoServer-Import</code> — <code>examples/import/E1-SslEchoServer.cc</code></li>
+<li><code>E2-SslClient-Import</code> — <code>examples/import/E2-SslClient.cc</code></li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DBUILD_TESTS=ON/OFF
+-DBUILD_BENCHMARKS=ON/OFF
+-DBUILD_EXAMPLES=ON/OFF
+-DBUILD_SHARED_LIBS=ON/OFF
+-DENABLE_LOG=ON/OFF
+-DENABLE_LTO=ON/OFF
+-DDISABLE_IOURING=ON/OFF
+-DBUILD_MODULE_EXAMPLES=ON/OFF</code></pre>
+<p><code>BUILD_MODULE_EXAMPLES</code> 需要 CMake &gt;= 3.28 且建议使用 Ninja/Visual Studio 生成器。</p>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.16+、OpenSSL（1.1.1+）、galay-kernel。</p>
+<p>启用日志时需要 spdlog；Linux 如启用 io_uring 需要 <code>liburing</code>。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-ssl" target="_blank">https://github.com/gzj-creator/galay-ssl</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-rpc 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-rpc 使用文档</h1>
+            <p class="page-subtitle">提供服务注册、远程调用与超时控制能力，用于构建低延迟服务间通信。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Service</span>
+                    <h1 class="docs-article-title">galay-rpc 使用文档</h1>
+                    <p class="docs-article-description">提供服务注册、远程调用与超时控制能力，用于构建低延迟服务间通信。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-rpc 是 Galay 库体系的服务通信组件，提供 unary/stream 调用模型与协程化客户端/服务端接口。</p>
+<p>它负责消息传输、超时与连接管理，服务治理策略可按业务场景扩展。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>RpcService</strong> — 以服务名+方法名注册处理器，统一四种调用模式</li>
+<li><strong>RpcServer</strong> — 负责连接管理、请求分发与响应回写</li>
+<li><strong>RpcClient</strong> — 提供 unary / stream 调用接口与超时控制</li>
+<li><strong>ServiceDiscovery</strong> — 注册发现抽象（内置本地实现与 Concept 约束）</li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>服务注册（example/include/E1-EchoServer.cpp）</h3>
+<pre><code>#include "galay-rpc/kernel/RpcServer.h"
+#include "galay-rpc/kernel/RpcService.h"
+
+using namespace galay::rpc;
+
+class EchoService : public RpcService {
+public:
+    EchoService() : RpcService("EchoService") {
+        registerMethod("echo", &amp;EchoService::echo);
+        registerClientStreamingMethod("echo", &amp;EchoService::echo);
+        registerServerStreamingMethod("echo", &amp;EchoService::echo);
+        registerBidiStreamingMethod("echo", &amp;EchoService::echo);
+    }
+
+    Coroutine echo(RpcContext& ctx) {
+        ctx.setPayload(ctx.request().payloadView());
+        co_return;
+    }
+};
+
+int main() {
+    auto service = std::make_shared&lt;EchoService&gt;();
+    RpcServerConfig config;
+    config.host = "0.0.0.0";
+    config.port = 9000;
+    RpcServer server(config);
+    server.registerService(service);
+    server.start();
+    return 0;
+}</code></pre>
+
+<h3>客户端调用（example/include/E2-EchoClient.cpp）</h3>
+<pre><code>#include "galay-rpc/kernel/RpcClient.h"
+
+Coroutine runClient() {
+    RpcClient client;
+    co_await client.connect("127.0.0.1", 9000);
+
+    auto unary = co_await client.call("EchoService", "echo", "hello");
+    auto bidi = co_await client.callBidiStreamFrame(
+        "EchoService", "echo", "hello", 5, true);
+
+    co_await client.close();
+}</code></pre>
+
+<h3>示例入口（与仓库一致）</h3>
+<ul>
+<li><code>E1/E2</code> — Echo（四模式：unary/client_stream/server_stream/bidi）</li>
+<li><code>E3/E4</code> — 真实流式（STREAM_INIT/STREAM_DATA/STREAM_END）</li>
+<li>源码路径：<code>example/include/</code> 与 <code>example/import/</code></li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DBUILD_TESTS=ON/OFF
+-DBUILD_BENCHMARKS=ON/OFF
+-DBUILD_EXAMPLES=ON/OFF
+-DBUILD_MODULE_EXAMPLES=ON/OFF
+-DGALAY_RPC_INSTALL_MODULE_INTERFACE=ON/OFF</code></pre>
+<p><code>BUILD_MODULE_EXAMPLES</code> 需要 CMake &gt;= 3.28，推荐 Ninja/Visual Studio 生成器。</p>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.16+、spdlog、galay-kernel（CMake 中为必需依赖）。</p>
+<p>服务发现默认提供本地注册中心；远端注册中心按业务侧扩展接入。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-rpc" target="_blank">https://github.com/gzj-creator/galay-rpc</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

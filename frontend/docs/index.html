@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docs | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body class="docs-index-page">
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">文档与兼容接入</h1>
+            <p class="page-subtitle">统一查看 galay-* 系列库能力、构建选项与接入方式，强调 include / import 并存与跨环境兼容策略。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <div class="docs-content">
+                <section class="docs-series-note">
+                    <div class="docs-compat-head">
+                        <h2>兼容性优先的模块接入</h2>
+                        <p>默认走 <code>#include</code> 稳定路径；条件满足时可启用 C++23 <code>import</code>。两种方式可并存，不强制迁移。</p>
+                    </div>
+                    <div class="docs-compat-pills">
+                        <span class="docs-compat-pill">稳定默认：include</span>
+                        <span class="docs-compat-pill">可选增强：module/import</span>
+                        <span class="docs-compat-pill">自动回退：无额外改造</span>
+                    </div>
+                    <div class="docs-compat-grid">
+                        <div class="docs-compat-card">
+                            <h3>稳定路径（推荐）</h3>
+                            <pre><code>#include "galay-kernel/..."
+#include "galay-http/..."
+#include "galay-redis/..."
+#include "galay-mcp/..."</code></pre>
+                            <p>跨平台稳定，构建门槛最低，适合所有工程环境。</p>
+                        </div>
+                        <div class="docs-compat-card">
+                            <h3>模块路径（可选）</h3>
+                            <pre><code>import galay.kernel;
+import galay.http;
+import galay.redis;
+import galay.mcp;</code></pre>
+                            <p>满足 CMake/生成器/编译器条件时启用，提升大型工程组织效率。</p>
+                        </div>
+                    </div>
+                    <div class="docs-compat-footer">
+                        <div class="docs-compat-foot-item">include 与 import 可在同一项目按模块渐进切换。</div>
+                        <div class="docs-compat-foot-item">模块路径不可用时自动回退 include，不阻塞构建。</div>
+                    </div>
+                </section>
+
+                <div class="docs-quick-links">
+                    <a href="galay-kernel.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">⚡</span>
+                        <div>
+                            <h3>galay-kernel</h3>
+                            <p>协程调度与异步 IO 运行时内核</p>
+                        </div>
+                    </a>
+                    <a href="galay-ssl.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🔒</span>
+                        <div>
+                            <h3>galay-ssl</h3>
+                            <p>协程友好的 TLS 传输层</p>
+                        </div>
+                    </a>
+                    <a href="galay-http.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🌐</span>
+                        <div>
+                            <h3>galay-http</h3>
+                            <p>HTTP/1.1 + HTTP/2 + WebSocket 协议层</p>
+                        </div>
+                    </a>
+                    <a href="galay-rpc.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">📡</span>
+                        <div>
+                            <h3>galay-rpc</h3>
+                            <p>面向服务通信的协程 RPC 框架</p>
+                        </div>
+                    </a>
+                    <a href="galay-redis.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🧱</span>
+                        <div>
+                            <h3>galay-redis</h3>
+                            <p>高并发场景的异步 Redis 客户端</p>
+                        </div>
+                    </a>
+                    <a href="galay-mysql.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🗄️</span>
+                        <div>
+                            <h3>galay-mysql</h3>
+                            <p>覆盖协议细节的 MySQL 客户端</p>
+                        </div>
+                    </a>
+                    <a href="galay-mongo.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🍃</span>
+                        <div>
+                            <h3>galay-mongo</h3>
+                            <p>支持 OP_MSG 与 BSON 的 MongoDB 客户端</p>
+                        </div>
+                    </a>
+                    <a href="galay-etcd.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🔑</span>
+                        <div>
+                            <h3>galay-etcd</h3>
+                            <p>etcd v3 协程客户端</p>
+                        </div>
+                    </a>
+                    <a href="galay-utils.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🛠️</span>
+                        <div>
+                            <h3>galay-utils</h3>
+                            <p>面向工程基础能力的 C++23 工具库</p>
+                        </div>
+                    </a>
+                    <a href="galay-mcp.html" class="docs-quick-link">
+                        <span class="docs-quick-link-icon">🤖</span>
+                        <div>
+                            <h3>galay-mcp</h3>
+                            <p>MCP 协议实现与 AI 工具接入层</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+</body>
+</html>

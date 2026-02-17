@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>galay-redis 使用文档 | Galay Framework</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/base.css?v=20260217d">
+    <link rel="stylesheet" href="../css/components.css?v=20260217d">
+    <link rel="stylesheet" href="../css/docs.css?v=20260217d">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="../index.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>home
+                </a>
+                <a href="../projects.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>projects
+                </a>
+                <a href="index.html?v=20260217d" class="nav-link active">
+                    <span class="nav-link-prefix">~/</span>docs
+                </a>
+                <a href="../blog.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>blog
+                </a>
+                <a href="../chat.html" class="nav-link">
+                    <span class="nav-link-prefix">~/</span>ai
+                </a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="../index.html" class="mobile-link">home</a>
+        <a href="../projects.html" class="mobile-link">projects</a>
+        <a href="index.html?v=20260217d" class="mobile-link active">docs</a>
+        <a href="../blog.html" class="mobile-link">blog</a>
+        <a href="../chat.html" class="mobile-link">ai</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <header class="page-header">
+        <div class="container">
+            <span class="page-tag">docs</span>
+            <h1 class="page-title">galay-redis 使用文档</h1>
+            <p class="page-subtitle">提供协程化 Redis 命令、超时控制与 Pipeline 能力，面向高并发缓存场景。</p>
+        </div>
+    </header>
+
+    <main class="docs-main">
+        <div class="container">
+            <article class="docs-article">
+                <header class="docs-article-header">
+                    <span class="docs-article-category">Cache</span>
+                    <h1 class="docs-article-title">galay-redis 使用文档</h1>
+                    <p class="docs-article-description">提供协程化 Redis 命令、超时控制与 Pipeline 能力，面向高并发缓存场景。</p>
+                </header>
+                <div class="docs-article-body">
+<h2>概览</h2>
+<p>galay-redis 是 Galay 库体系的 Redis 客户端组件，提供协程命令、同步会话与 pipeline 能力。</p>
+<p>它聚焦 RESP 通信与高并发访问，不涉及 Redis 服务端运维和数据建模策略。</p>
+
+<h2>架构</h2>
+<ul>
+<li><strong>RedisClient（async）</strong> — 协程命令接口，返回 Awaitable 并支持超时链式配置</li>
+<li><strong>RedisSession（sync）</strong> — 同步阻塞接口，便于脚本或简单场景接入</li>
+<li><strong>RedisPipelineAwaitable</strong> — 批量命令单次往返，降低 RTT 开销</li>
+<li><strong>拓扑与连接池</strong> — 提供 <code>RedisConnectionPool</code> 与 <code>RedisTopologyClient</code> 扩展能力</li>
+</ul>
+
+<h2>核心 API</h2>
+<h3>最小异步示例（README 快速开始）</h3>
+<pre><code>#include "galay-redis/async/RedisClient.h"
+#include &lt;galay-kernel/kernel/Runtime.h&gt;
+
+using namespace galay::redis;
+using namespace galay::kernel;
+
+Coroutine example(IOScheduler* scheduler) {
+    RedisClient client(scheduler);
+    co_await client.connect("127.0.0.1", 6379);
+
+    co_await client.set("key", "value").timeout(std::chrono::seconds(5));
+    auto r = co_await client.get("key");
+    if (r &amp;&amp; r.value()) {
+        auto& vals = r.value().value();
+        // vals[0].toString()
+    }
+
+    co_await client.close();
+}</code></pre>
+
+<h3>Pipeline 示例（async/RedisClient.h）</h3>
+<pre><code>Coroutine pipelineExample(IOScheduler* scheduler) {
+    RedisClient client(scheduler);
+    co_await client.connect("127.0.0.1", 6379);
+
+    std::vector&lt;std::vector&lt;std::string&gt;&gt; commands = {
+        {"SET", "k1", "v1"},
+        {"SET", "k2", "v2"},
+        {"MGET", "k1", "k2"}
+    };
+
+    auto result = co_await client.pipeline(commands).timeout(std::chrono::seconds(10));
+    co_await client.close();
+}</code></pre>
+
+<h3>测试与示例入口</h3>
+<ul>
+<li><code>test/test_redis_client_timeout.cc</code> — 超时与稳定性</li>
+<li><code>test/test_redis_client_benchmark.cc</code> — 普通/管道压测</li>
+<li><code>test/test_sync.cc</code>、<code>test/test_async.cc</code> — 同步与异步路径</li>
+</ul>
+
+<h2>构建</h2>
+<pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j</code></pre>
+
+<h3>构建选项</h3>
+<pre><code>-DGALAY_REDIS_ENABLE_IMPORT_COMPILATION=ON/OFF
+-DGALAY_REDIS_INSTALL_MODULE_INTERFACE=ON/OFF</code></pre>
+<p>当前顶层 CMake 默认构建库与 test 目录，没有单独的 <code>BUILD_TESTS</code> 开关。</p>
+
+<h2>依赖</h2>
+<p>C++23 编译器、CMake 3.20+、galay-kernel、galay-utils、OpenSSL、spdlog。</p>
+
+<h2>项目地址</h2>
+<p><a href="https://github.com/gzj-creator/galay-redis" target="_blank">https://github.com/gzj-creator/galay-redis</a></p>
+                </div>
+            </article>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">[galay]</span>
+                    <p class="footer-tagline">Modern C++23 Async Runtime</p>
+                </div>
+                <div class="footer-links">
+                    <div class="footer-column">
+                        <h4>项目</h4>
+                        <a href="../projects.html#kernel">galay-kernel</a>
+                        <a href="../projects.html#ssl">galay-ssl</a>
+                        <a href="../projects.html#http">galay-http</a>
+                        <a href="../projects.html#rpc">galay-rpc</a>
+                        <a href="../projects.html#redis">galay-redis</a>
+                        <a href="../projects.html#mysql">galay-mysql</a>
+                        <a href="../projects.html#mongo">galay-mongo</a>
+                        <a href="../projects.html#etcd">galay-etcd</a>
+                        <a href="../projects.html#utils">galay-utils</a>
+                        <a href="../projects.html#mcp">galay-mcp</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>资源</h4>
+                        <a href="index.html?v=20260217d">使用文档</a>
+                        <a href="../projects.html">项目列表</a>
+                        <a href="../blog.html">博客</a>
+                    </div>
+                    <div class="footer-column">
+                        <h4>社区</h4>
+                        <a href="https://github.com/gzj-creator" target="_blank">GitHub</a>
+                        <a href="#">Issues</a>
+                        <a href="#">Discussions</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2024 Galay Framework. MIT License.</p>
+                <p class="footer-made">Made with <span class="heart">♥</span> and C++23</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../js/main.js?v=20260217d"></script>
+    <script src="../js/docs-quickstart.js"></script>
+</body>
+</html>

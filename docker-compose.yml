@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  static:
+    image: ubuntu-24.04:galay-web-1.0
+    container_name: gblob-static
+    working_dir: /app
+    command: [./bin/static-server]
+    environment:
+      STATIC_HOST: 0.0.0.0
+      STATIC_PORT: 80
+      STATIC_FRONTEND_ROOT: /app/frontend
+      STATIC_LOG_DIR: /app/logs
+      STATIC_LOG_FILE: static-server.log
+      STATIC_CONFIG_PATH: /app/config/static-server.conf
+      API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
+      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-}
+      API_PROXY_ROUTE_PREFIX: ${API_PROXY_ROUTE_PREFIX:-/api}
+      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-127.0.0.1}
+      API_PROXY_UPSTREAM_PORT: ${API_PROXY_UPSTREAM_PORT:-8080}
+      API_PROXY_MODE: ${API_PROXY_MODE:-http}
+      LD_LIBRARY_PATH: /usr/local/lib
+    ports:
+      - "80:80"
+    volumes:
+      - ./static/bin:/app/bin:ro
+      - ./static/logs:/app/logs
+      - ./static/config:/app/config:ro
+      - ./static/frontend:/app/frontend:ro
+    restart: unless-stopped

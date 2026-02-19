@@ -1,60 +1,95 @@
-# Galay Static Service
+# static-server
 
-`service/static` 现在提供两部分能力：
-- 静态资源服务（`/`）
-- API 反向代理（`/api/*` Raw 转发到上游 `/*`）
+`service/static` 现在使用 **CMake** 构建，不再依赖 `compiler.sh`。
 
-## Docker Compose 运行
+## 导出二进制（推荐）
+
+在 `service/static` 目录执行：
 
 ```bash
-cd service/static
-cp .env.example .env
-docker compose up --build -d
+docker buildx build \
+  --build-arg STATIC_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
+  --build-arg GALAY_KERNEL_BACKEND=epoll \
+  --target artifact \
+  --output type=local,dest=/home/ubuntu/service/gblob/static/bin \
+  -f docker/Dockerfile \
+  .
 ```
 
-启动后访问：`http://localhost:8080`
+导出结果：
 
-转发行为示例：
-- 请求 `GET /api/projects` -> 上游 `GET /projects`
-- 请求 `POST /api/chat` -> 上游 `POST /chat`
-
-停止服务：
-
-```bash
-cd service/static
-docker compose down
+```text
+/home/ubuntu/service/gblob/static/bin/static-server
 ```
 
-## 直接构建镜像
+## 本地 CMake 构建
 
-在仓库根目录执行（构建上下文需要包含 `frontend/`）：
+在仓库根目录执行：
 
 ```bash
-docker build -f service/static/Dockerfile -t galay-static:latest .
-docker run --rm -p 8080:8080 galay-static:latest
+cmake -S service/static -B build/static \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH=/usr/local \
+  -DGALAY_KERNEL_BACKEND=epoll
+cmake --build build/static -j"$(nproc)"
 ```
 
-## 环境变量
+产物：
 
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `STATIC_HOST` | `0.0.0.0` | 监听地址 |
-| `STATIC_PORT` | `8080` | 监听端口 |
-| `STATIC_FRONTEND_ROOT` | `/app/frontend` | 静态文件目录 |
-| `API_PROXY_UPSTREAM_HOST` | `127.0.0.1` | `/api/*` 转发上游主机 |
-| `API_PROXY_UPSTREAM_PORT` | `8081` | `/api/*` 转发上游端口 |
-| `GALAY_KERNEL_REPO` | `https://github.com/gzj-creator/galay-kernel.git` | 构建阶段仓库地址 |
-| `GALAY_KERNEL_REF` | `main` | 构建阶段分支/Tag/Commit |
-| `GALAY_HTTP_REPO` | `https://github.com/gzj-creator/galay-http.git` | 构建阶段仓库地址 |
-| `GALAY_HTTP_REF` | `main` | 构建阶段分支/Tag/Commit |
+```text
+build/static/static-server
+```
 
-## 本地非容器运行
+## 配置文件
 
-`main.cc` 同样支持以上 `STATIC_*` 与 `API_PROXY_*` 环境变量。  
-本地编译可继续使用：
+默认配置文件：
 
-```bash
-cd service/static
-./compiler.sh
-./server
+```text
+/app/config/static-server.conf
+```
+
+示例文件在：
+
+```text
+service/static/config/static-server.conf
+```
+
+关键配置项：
+
+```text
+proxy.enabled=true
+proxy.route=/api,127.0.0.1,8080,http
+proxy.route=/auth,127.0.0.1,8081,http
+```
+
+支持两种多路由写法：
+
+```text
+# 1) 重复行（推荐）
+proxy.route=<prefix>,<host>,<port>,<mode>
+
+# 2) 索引键
+proxy.route.1.prefix=/api
+proxy.route.1.upstream_host=127.0.0.1
+proxy.route.1.upstream_port=8080
+proxy.route.1.mode=http
+```
+
+可通过环境变量覆盖路径：
+
+```text
+STATIC_CONFIG_PATH=/custom/path/static-server.conf
+```
+
+兼容的环境变量：
+
+```text
+# 多路由（优先）
+API_PROXY_ROUTES=/api,127.0.0.1,8080,http;/auth,127.0.0.1,8081,http
+
+# 单路由（兼容旧配置）
+API_PROXY_ROUTE_PREFIX=/api
+API_PROXY_UPSTREAM_HOST=127.0.0.1
+API_PROXY_UPSTREAM_PORT=8080
+API_PROXY_MODE=http
 ```

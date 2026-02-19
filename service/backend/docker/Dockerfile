@@ -1,7 +1,7 @@
-ARG BACKEND_BASE_IMAGE=ubuntu-24.04:galay-web-1.0
+ARG STATIC_BASE_IMAGE=ubuntu-24.04:galay-web-1.0
 ARG GALAY_KERNEL_BACKEND=epoll
 
-FROM ${BACKEND_BASE_IMAGE} AS builder
+FROM ${STATIC_BASE_IMAGE} AS builder
 
 WORKDIR /src/service/backend
 COPY CMakeLists.txt /src/service/backend/CMakeLists.txt

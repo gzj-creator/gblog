@@ -66,7 +66,7 @@ make -j$(nproc)
 
 ```bash
 docker buildx build \
-  --build-arg BACKEND_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
+  --build-arg STATIC_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
   --build-arg GALAY_KERNEL_BACKEND=epoll \
   --target artifact \
   --output type=local,dest=/home/ubuntu/service/gblob/service/backend/bin \

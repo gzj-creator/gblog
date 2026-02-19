@@ -45,6 +45,7 @@ service/ai/
 │   ├── Dockerfile            # Docker 构建
 │   └── docker-compose.yml    # Docker Compose
 ├── scripts/
+│   ├── builder.sh           # Docker 镜像构建脚本
 │   ├── build_index.py        # 构建向量索引
 │   ├── install_linux.sh      # Linux 一键安装脚本
 │   ├── run_server.py         # 启动服务
@@ -102,6 +103,17 @@ make install
 # 或
 pip install -r requirements.txt
 ```
+
+### Docker 构建
+
+```bash
+cd service/ai
+bash scripts/builder.sh
+```
+
+可选环境变量：
+- `AI_BASE_IMAGE`：默认 `python:3.11-slim`
+- `AI_IMAGE_TAG`：默认 `gblob-ai:local`
 
 ### 2. 配置环境变量
 

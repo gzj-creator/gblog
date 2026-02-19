@@ -65,6 +65,12 @@ make -j$(nproc)
 ## 导出二进制（Docker）
 
 ```bash
+bash scripts/builder.sh
+```
+
+等价命令：
+
+```bash
 docker buildx build \
   --build-arg STATIC_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
   --build-arg GALAY_KERNEL_BACKEND=epoll \

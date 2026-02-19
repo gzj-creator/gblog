@@ -1,4 +1,6 @@
-FROM python:3.11-slim AS base
+ARG AI_BASE_IMAGE=python:3.11-slim
+
+FROM ${AI_BASE_IMAGE} AS base
 
 WORKDIR /app
 

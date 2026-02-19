@@ -13,7 +13,8 @@ services:
       LOG_LEVEL: INFO
       GALAY_DOCS_ROOT_PATH: ${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}
     volumes:
-      - ./service/ai/vector_store:/app/vector_store
+      - ./service/ai/data:/app/vector_store
+      - ./service/ai/logs:/app/logs
       - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
     restart: unless-stopped
 

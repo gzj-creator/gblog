@@ -4,7 +4,8 @@ __pycache__/
 venv/
 .venv/
 .env
-vector_store/
+data/
+logs/
 *.log
 .DS_Store
 *.egg-info/

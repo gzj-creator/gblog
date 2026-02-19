@@ -12,6 +12,7 @@
 #include <nlohmann/json.hpp>
 #include <iostream>
 #include <csignal>
+#include <filesystem>
 
 using namespace galay::http;
 using namespace galay::kernel;
@@ -199,7 +200,7 @@ int main(int argc, char* argv[]) {
     // 解析命令行参数
     std::string host = "0.0.0.0";
     uint16_t port = 8080;
-    std::string staticDir = "../frontend";
+    std::string staticDir;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -215,7 +216,7 @@ int main(int argc, char* argv[]) {
                       << "Options:\n"
                       << "  -h, --host <host>    Server host (default: 0.0.0.0)\n"
                       << "  -p, --port <port>    Server port (default: 8080)\n"
-                      << "  -s, --static <dir>   Static files directory (default: ../frontend)\n"
+                      << "  -s, --static <dir>   Static files directory (default: disabled)\n"
                       << "  --help               Show this help message\n";
             return 0;
         }
@@ -261,14 +262,17 @@ int main(int argc, char* argv[]) {
     staticConfig.setSmallFileThreshold(64 * 1024);    // 64KB
     staticConfig.setLargeFileThreshold(1024 * 1024);  // 1MB
 
-    // 挂载静态文件目录
-    if (!router.mount("/", staticDir, staticConfig)) {
-        std::cerr << "[ERROR] Failed to mount static directory: " << staticDir << std::endl;
-        std::cerr << "[INFO] Make sure the frontend directory exists.\n";
-        return 1;
+    // 可选：仅当指定目录时挂载静态文件
+    if (!staticDir.empty()) {
+        if (!std::filesystem::exists(staticDir) || !std::filesystem::is_directory(staticDir)) {
+            std::cerr << "[WARN] Static directory not found, static mount skipped: " << staticDir << std::endl;
+        } else {
+            router.mount("/", staticDir, staticConfig);
+            std::cout << "[INFO] Static files: " << staticDir << "\n";
+        }
+    } else {
+        std::cout << "[INFO] Static files: disabled\n";
     }
-
-    std::cout << "[INFO] Static files: " << staticDir << "\n";
     std::cout << "[INFO] API endpoints:\n";
     std::cout << "       GET /api/health\n";
     std::cout << "       GET /api/projects\n";

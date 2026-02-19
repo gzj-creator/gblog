@@ -23,7 +23,7 @@ cd "$BUILD_DIR"
 
 # 启动服务器（后台运行）
 SERVER_BIN="$BUILD_DIR/bin/blog-server"
-STATIC_DIR="$PROJECT_DIR/../frontend"
+STATIC_DIR="$PROJECT_DIR/../../frontend"
 
 if [ ! -f "$SERVER_BIN" ]; then
     echo "[ERROR] Server binary not found"

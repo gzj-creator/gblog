@@ -2,18 +2,20 @@ version: "3.8"
 
 services:
   ai:
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: galay-ai-service
     ports:
       - "8000:8000"
     env_file:
-      - .env
+      - ../.env
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
       - GALAY_DOCS_ROOT_PATH=${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}
     volumes:
-      - ./vector_store:/app/vector_store
+      - ../vector_store:/app/vector_store
       # 挂载仓库根目录，容器内自动扫描挂载目标下所有一级子目录
       - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
     restart: unless-stopped

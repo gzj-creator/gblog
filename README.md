@@ -18,21 +18,19 @@ blog/
 │   ├── login.html     # 登录页面
 │   ├── register.html  # 注册页面
 │   └── profile.html   # 个人中心
-├── backend/           # 后端服务
-│   ├── BlogServer.cc  # 服务器主程序
-│   ├── main.cc        # 入口文件
-│   ├── CMakeLists.txt # 构建配置
-│   └── docs/          # 后端文档
-├── Dockerfile         # Docker 镜像构建
-└── k8s/               # Kubernetes 配置
+├── service/           # 服务目录
+│   ├── blog/          # C++ 博客 API 服务（原 backend）
+│   ├── static/        # 静态站点 + 反向代理
+│   └── ai/            # AI 问答服务
+└── docker-compose.yml # 容器编排（static + service）
 ```
 
 ## 技术栈
 
 ### 后端
-- **galay-kernel**: 高性能 C++20 协程网络库
+- **galay-kernel**: 高性能 C++ 协程网络库
 - **galay-http**: HTTP/WebSocket 协议库
-- **C++20**: 协程、concepts、ranges 等现代特性
+- **C++23**: 协程、`std::expected`、concepts、ranges 等现代特性
 
 ### 前端
 - **原生 HTML/CSS/JS**: 无框架依赖
@@ -63,15 +61,15 @@ blog/
 ## 快速开始
 
 ### 环境要求
-- C++20 编译器 (GCC 11+, Clang 14+)
+- C++23 编译器 (GCC 13+, Clang 17+)
 - CMake 3.20+
 - galay-kernel 和 galay-http 已安装
 
 ### 编译运行
 
 ```bash
-# 进入后端目录
-cd backend
+# 进入 API 服务目录
+cd service/blog
 
 # 编译
 mkdir build && cd build
@@ -79,7 +77,7 @@ cmake ..
 make -j$(nproc)
 
 # 运行
-./blog-server -p 8080 -s ../../frontend
+./blog-server -p 8080
 ```
 
 ### 命令行参数
@@ -88,7 +86,7 @@ make -j$(nproc)
 |------|------|--------|
 | `-h, --host` | 监听地址 | 0.0.0.0 |
 | `-p, --port` | 监听端口 | 8080 |
-| `-s, --static` | 静态文件目录 | ../frontend |
+| `-s, --static` | 静态文件目录 | disabled |
 
 ### 访问
 
@@ -97,21 +95,18 @@ make -j$(nproc)
 ## Docker 部署
 
 ```bash
-# 构建镜像
-docker build -t galay-blog:latest .
-
-# 运行容器
-docker run -d -p 8080:8080 galay-blog:latest
+# 启动 static + service
+docker compose up -d
 ```
 
 ## Kubernetes 部署
 
 ```bash
 # 应用配置
-kubectl apply -f k8s/
+kubectl apply -f service/blog/k8s/
 
 # 查看状态
-kubectl get pods -l app=blog-server
+kubectl get pods -l app=blog-service
 ```
 
 ## 性能指标

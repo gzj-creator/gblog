@@ -20,7 +20,7 @@
 
 ### 依赖
 
-- C++20 编译器 (GCC 11+, Clang 14+)
+- C++23 编译器 (GCC 13+, Clang 17+)
 - CMake 3.16+
 - galay-kernel
 - galay-http
@@ -44,7 +44,7 @@ make -j$(nproc)
 ./scripts/S1-RunServer.sh
 
 # 或直接运行
-./build/bin/blog-server -p 8080 -s ../frontend
+./build/bin/blog-server -p 8080 -s ../../frontend
 ```
 
 ### 命令行参数
@@ -53,7 +53,7 @@ make -j$(nproc)
 |------|------|--------|
 | `-h, --host` | 服务器地址 | 0.0.0.0 |
 | `-p, --port` | 服务器端口 | 8080 |
-| `-s, --static` | 静态文件目录 | ../frontend |
+| `-s, --static` | 静态文件目录 | disabled |
 
 ## 测试
 
@@ -65,7 +65,7 @@ make -j$(nproc)
 ## 项目结构
 
 ```
-backend/
+service/blog/
 ├── BlogServer.cc       # 主程序
 ├── CMakeLists.txt      # 构建配置
 ├── README.md           # 项目说明

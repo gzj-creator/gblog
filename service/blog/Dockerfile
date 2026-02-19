@@ -60,9 +60,6 @@ RUN ldconfig
 # 复制可执行文件
 COPY --from=builder /app/build/bin/blog-server /usr/local/bin/
 
-# 复制前端静态文件
-COPY --from=builder /app/../frontend /app/frontend
-
 WORKDIR /app
 
 # 设置权限
@@ -77,11 +74,9 @@ EXPOSE 8080
 # 环境变量
 ENV BLOG_HOST=0.0.0.0
 ENV BLOG_PORT=8080
-ENV BLOG_STATIC_DIR=/app/frontend
-
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
 # 启动服务
-CMD ["blog-server", "--static", "/app/frontend"]
+CMD ["blog-server", "-h", "0.0.0.0", "-p", "8080"]

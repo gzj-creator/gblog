@@ -15,6 +15,10 @@
 #include <vector>
 #include <map>
 #include <csignal>
+#include <filesystem>
+#include <optional>
+#include <mutex>
+#include <cctype>
 
 using namespace galay::http;
 using namespace galay::kernel;
@@ -73,6 +77,23 @@ struct DocItem {
     std::string m_category;
     std::string m_content;
     int m_order;
+};
+
+struct AuthUser {
+    std::string m_username = "demo";
+    std::string m_display_name = "Demo User";
+    std::string m_email = "demo@example.com";
+    std::string m_bio;
+    std::string m_website;
+    std::string m_github;
+    std::string m_password = "demo123456";
+};
+
+struct NotificationSettings {
+    bool m_email_notifications = true;
+    bool m_new_post_notifications = true;
+    bool m_comment_reply_notifications = true;
+    bool m_release_notifications = true;
 };
 
 // ============================================
@@ -234,6 +255,12 @@ static std::vector<DocItem> g_docs = {
     {"api-httprouter", "HttpRouter API", "HttpRouter 类的完整 API 参考", "api", "", 10}
 };
 
+static AuthUser g_auth_user;
+static NotificationSettings g_notification_settings;
+static std::string g_access_token = "galay-access-token";
+static std::string g_refresh_token = "galay-refresh-token";
+static std::mutex g_auth_mutex;
+
 // ============================================
 // JSON 序列化辅助函数
 // ============================================
@@ -340,6 +367,118 @@ std::string allDocsToJson() {
     }
     json += "]";
     return json;
+}
+
+std::string makeSuccessJson(const std::string& dataJson) {
+    return "{\"success\":true,\"data\":" + dataJson + "}";
+}
+
+std::string makeErrorJson(const std::string& message) {
+    return "{\"success\":false,\"error\":{\"message\":\"" + escapeJson(message) + "\"}}";
+}
+
+std::string authUserToJson(const AuthUser& user) {
+    std::string json = "{";
+    json += "\"username\":\"" + escapeJson(user.m_username) + "\",";
+    json += "\"display_name\":\"" + escapeJson(user.m_display_name) + "\",";
+    json += "\"email\":\"" + escapeJson(user.m_email) + "\",";
+    json += "\"bio\":\"" + escapeJson(user.m_bio) + "\",";
+    json += "\"website\":\"" + escapeJson(user.m_website) + "\",";
+    json += "\"github\":\"" + escapeJson(user.m_github) + "\"";
+    json += "}";
+    return json;
+}
+
+std::string notificationSettingsToJson(const NotificationSettings& settings) {
+    std::string json = "{";
+    json += "\"email_notifications\":" + std::string(settings.m_email_notifications ? "true" : "false") + ",";
+    json += "\"new_post_notifications\":" + std::string(settings.m_new_post_notifications ? "true" : "false") + ",";
+    json += "\"comment_reply_notifications\":" + std::string(settings.m_comment_reply_notifications ? "true" : "false") + ",";
+    json += "\"release_notifications\":" + std::string(settings.m_release_notifications ? "true" : "false");
+    json += "}";
+    return json;
+}
+
+void skipSpaces(const std::string& source, size_t& pos) {
+    while (pos < source.size() && std::isspace(static_cast<unsigned char>(source[pos]))) {
+        ++pos;
+    }
+}
+
+std::optional<std::string> extractJsonStringField(const std::string& body, const std::string& key) {
+    const std::string pattern = "\"" + key + "\"";
+    const size_t keyPos = body.find(pattern);
+    if (keyPos == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const size_t colonPos = body.find(':', keyPos + pattern.size());
+    if (colonPos == std::string::npos) {
+        return std::nullopt;
+    }
+
+    size_t valuePos = colonPos + 1;
+    skipSpaces(body, valuePos);
+    if (valuePos >= body.size() || body[valuePos] != '"') {
+        return std::nullopt;
+    }
+    ++valuePos;
+
+    std::string out;
+    out.reserve(64);
+    while (valuePos < body.size()) {
+        const char ch = body[valuePos];
+        if (ch == '\\' && valuePos + 1 < body.size()) {
+            out.push_back(body[valuePos + 1]);
+            valuePos += 2;
+            continue;
+        }
+        if (ch == '"') {
+            return out;
+        }
+        out.push_back(ch);
+        ++valuePos;
+    }
+    return std::nullopt;
+}
+
+std::optional<bool> extractJsonBoolField(const std::string& body, const std::string& key) {
+    const std::string pattern = "\"" + key + "\"";
+    const size_t keyPos = body.find(pattern);
+    if (keyPos == std::string::npos) {
+        return std::nullopt;
+    }
+
+    const size_t colonPos = body.find(':', keyPos + pattern.size());
+    if (colonPos == std::string::npos) {
+        return std::nullopt;
+    }
+
+    size_t valuePos = colonPos + 1;
+    skipSpaces(body, valuePos);
+    if (valuePos >= body.size()) {
+        return std::nullopt;
+    }
+
+    if (body.compare(valuePos, 4, "true") == 0) {
+        return true;
+    }
+    if (body.compare(valuePos, 5, "false") == 0) {
+        return false;
+    }
+    return std::nullopt;
+}
+
+bool hasValidBearerToken(HttpRequest& req) {
+    const std::string auth = req.header().headerPairs().getValue("Authorization");
+    constexpr std::string_view kPrefix = "Bearer ";
+    if (auth.rfind(kPrefix.data(), 0) != 0) {
+        return false;
+    }
+
+    const std::string token = auth.substr(kPrefix.size());
+    std::lock_guard<std::mutex> lock(g_auth_mutex);
+    return !g_access_token.empty() && token == g_access_token;
 }
 
 // ============================================
@@ -574,6 +713,357 @@ Coroutine getDocByIdHandler(HttpConn& conn, HttpRequest req) {
     co_return;
 }
 
+/**
+ * @brief 用户登录
+ */
+Coroutine authLoginHandler(HttpConn& conn, HttpRequest req) {
+    const std::string body = req.bodyStr();
+    const std::string username = extractJsonStringField(body, "username").value_or("demo");
+    const std::string password = extractJsonStringField(body, "password").value_or("");
+
+    AuthUser userSnapshot;
+    std::string accessToken;
+    std::string refreshToken;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        if (!username.empty()) {
+            g_auth_user.m_username = username;
+            if (g_auth_user.m_display_name.empty()) {
+                g_auth_user.m_display_name = username;
+            }
+        }
+        if (!password.empty()) {
+            g_auth_user.m_password = password;
+        }
+        accessToken = g_access_token;
+        refreshToken = g_refresh_token;
+        userSnapshot = g_auth_user;
+    }
+
+    const std::string dataJson =
+        "{\"access_token\":\"" + escapeJson(accessToken) + "\","
+        "\"refresh_token\":\"" + escapeJson(refreshToken) + "\","
+        "\"user\":" + authUserToJson(userSnapshot) + "}";
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(dataJson))
+        .build();
+
+    auto writer = conn.getWriter();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 用户注册
+ */
+Coroutine authRegisterHandler(HttpConn& conn, HttpRequest req) {
+    const std::string body = req.bodyStr();
+    const std::string username = extractJsonStringField(body, "username").value_or("demo");
+    const std::string email = extractJsonStringField(body, "email").value_or("demo@example.com");
+    const std::string password = extractJsonStringField(body, "password").value_or("demo123456");
+
+    AuthUser userSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        g_auth_user.m_username = username;
+        g_auth_user.m_display_name = username;
+        g_auth_user.m_email = email;
+        g_auth_user.m_password = password;
+        userSnapshot = g_auth_user;
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(authUserToJson(userSnapshot)))
+        .build();
+
+    auto writer = conn.getWriter();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 刷新 access token
+ */
+Coroutine authRefreshHandler(HttpConn& conn, HttpRequest req) {
+    const std::string body = req.bodyStr();
+    const std::string refreshToken = extractJsonStringField(body, "refresh_token").value_or("");
+
+    std::string currentAccessToken;
+    bool tokenMatched = false;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        tokenMatched = (!refreshToken.empty() && refreshToken == g_refresh_token);
+        currentAccessToken = g_access_token;
+    }
+
+    auto writer = conn.getWriter();
+    if (!tokenMatched) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("refresh token invalid"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    const std::string dataJson = "{\"access_token\":\"" + escapeJson(currentAccessToken) + "\"}";
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(dataJson))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 登出
+ */
+Coroutine authLogoutHandler(HttpConn& conn, HttpRequest req) {
+    (void)req;
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson("{}"))
+        .build();
+
+    auto writer = conn.getWriter();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 获取当前用户信息
+ */
+Coroutine authMeHandler(HttpConn& conn, HttpRequest req) {
+    auto writer = conn.getWriter();
+    if (!hasValidBearerToken(req)) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("unauthorized"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    AuthUser userSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        userSnapshot = g_auth_user;
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(authUserToJson(userSnapshot)))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 更新个人资料
+ */
+Coroutine authUpdateProfileHandler(HttpConn& conn, HttpRequest req) {
+    auto writer = conn.getWriter();
+    if (!hasValidBearerToken(req)) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("unauthorized"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    const std::string body = req.bodyStr();
+    AuthUser userSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        if (const auto v = extractJsonStringField(body, "display_name"); v.has_value()) g_auth_user.m_display_name = *v;
+        if (const auto v = extractJsonStringField(body, "email"); v.has_value()) g_auth_user.m_email = *v;
+        if (const auto v = extractJsonStringField(body, "bio"); v.has_value()) g_auth_user.m_bio = *v;
+        if (const auto v = extractJsonStringField(body, "website"); v.has_value()) g_auth_user.m_website = *v;
+        if (const auto v = extractJsonStringField(body, "github"); v.has_value()) g_auth_user.m_github = *v;
+        userSnapshot = g_auth_user;
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(authUserToJson(userSnapshot)))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 修改密码
+ */
+Coroutine authUpdatePasswordHandler(HttpConn& conn, HttpRequest req) {
+    auto writer = conn.getWriter();
+    if (!hasValidBearerToken(req)) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("unauthorized"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    const std::string body = req.bodyStr();
+    const std::string oldPassword = extractJsonStringField(body, "old_password").value_or("");
+    const std::string newPassword = extractJsonStringField(body, "new_password").value_or("");
+
+    bool oldPasswordValid = true;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        oldPasswordValid = (oldPassword.empty() || oldPassword == g_auth_user.m_password);
+        if (oldPasswordValid && !newPassword.empty()) {
+            g_auth_user.m_password = newPassword;
+        }
+    }
+
+    if (!oldPasswordValid) {
+        auto response = Http1_1ResponseBuilder::badRequest()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("old password incorrect"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson("{}"))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 更新通知设置
+ */
+Coroutine authUpdateNotificationsHandler(HttpConn& conn, HttpRequest req) {
+    auto writer = conn.getWriter();
+    if (!hasValidBearerToken(req)) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("unauthorized"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    const std::string body = req.bodyStr();
+    NotificationSettings settingsSnapshot;
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        if (const auto v = extractJsonBoolField(body, "email_notifications"); v.has_value()) g_notification_settings.m_email_notifications = *v;
+        if (const auto v = extractJsonBoolField(body, "new_post_notifications"); v.has_value()) g_notification_settings.m_new_post_notifications = *v;
+        if (const auto v = extractJsonBoolField(body, "comment_reply_notifications"); v.has_value()) g_notification_settings.m_comment_reply_notifications = *v;
+        if (const auto v = extractJsonBoolField(body, "release_notifications"); v.has_value()) g_notification_settings.m_release_notifications = *v;
+        settingsSnapshot = g_notification_settings;
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson(notificationSettingsToJson(settingsSnapshot)))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
+/**
+ * @brief 删除账号
+ */
+Coroutine authDeleteAccountHandler(HttpConn& conn, HttpRequest req) {
+    auto writer = conn.getWriter();
+    if (!hasValidBearerToken(req)) {
+        auto response = Http1_1ResponseBuilder::unauthorized()
+            .header("Server", "Galay-Blog/1.0")
+            .header("Access-Control-Allow-Origin", "*")
+            .json(makeErrorJson("unauthorized"))
+            .build();
+        while (true) {
+            auto result = co_await writer.sendResponse(response);
+            if (!result || result.value()) break;
+        }
+        co_return;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_auth_mutex);
+        g_access_token.clear();
+        g_refresh_token.clear();
+    }
+
+    auto response = Http1_1ResponseBuilder::ok()
+        .header("Server", "Galay-Blog/1.0")
+        .header("Access-Control-Allow-Origin", "*")
+        .json(makeSuccessJson("{}"))
+        .build();
+    while (true) {
+        auto result = co_await writer.sendResponse(response);
+        if (!result || result.value()) break;
+    }
+    co_return;
+}
+
 // ============================================
 // 主函数
 // ============================================
@@ -582,7 +1072,7 @@ int main(int argc, char* argv[]) {
     // 解析命令行参数
     std::string host = "0.0.0.0";
     uint16_t port = 8080;
-    std::string staticDir = "../frontend";
+    std::string staticDir;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
@@ -598,7 +1088,7 @@ int main(int argc, char* argv[]) {
                       << "Options:\n"
                       << "  -h, --host <host>    Server host (default: 0.0.0.0)\n"
                       << "  -p, --port <port>    Server port (default: 8080)\n"
-                      << "  -s, --static <dir>   Static files directory (default: ../frontend)\n"
+                      << "  -s, --static <dir>   Static files directory (default: disabled)\n"
                       << "  --help               Show this help message\n";
             return 0;
         }
@@ -615,14 +1105,36 @@ int main(int argc, char* argv[]) {
     // 创建路由器
     HttpRouter router;
 
-    // 注册 API 路由
-    router.addHandler<HttpMethod::GET>("/api/health", healthHandler);
-    router.addHandler<HttpMethod::GET>("/api/projects", getProjectsHandler);
-    router.addHandler<HttpMethod::GET>("/api/projects/:id", getProjectByIdHandler);
-    router.addHandler<HttpMethod::GET>("/api/posts", getPostsHandler);
-    router.addHandler<HttpMethod::GET>("/api/posts/:id", getPostByIdHandler);
-    router.addHandler<HttpMethod::GET>("/api/docs", getDocsHandler);
-    router.addHandler<HttpMethod::GET>("/api/docs/:id", getDocByIdHandler);
+    const auto joinRoute = [](const std::string& prefix, const std::string& path) {
+        return prefix.empty() ? path : prefix + path;
+    };
+
+    // 博客 API：兼容直连 (/api/...) 与 static 去前缀转发 (/...)
+    for (const std::string& prefix : {std::string("/api"), std::string("")}) {
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/health"), healthHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/projects"), getProjectsHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/projects/:id"), getProjectByIdHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/posts"), getPostsHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/posts/:id"), getPostByIdHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/docs"), getDocsHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(prefix, "/docs/:id"), getDocByIdHandler);
+    }
+
+    // 认证接口：
+    // 1) /api/auth/... 直连
+    // 2) /auth/...     经过 static 的 /api 前缀转发后
+    // 3) /...          经过 static 的 /auth 前缀转发后
+    for (const std::string& authPrefix : {std::string("/api/auth"), std::string("/auth"), std::string("")}) {
+        router.addHandler<HttpMethod::POST>(joinRoute(authPrefix, "/login"), authLoginHandler);
+        router.addHandler<HttpMethod::POST>(joinRoute(authPrefix, "/register"), authRegisterHandler);
+        router.addHandler<HttpMethod::POST>(joinRoute(authPrefix, "/refresh"), authRefreshHandler);
+        router.addHandler<HttpMethod::POST>(joinRoute(authPrefix, "/logout"), authLogoutHandler);
+        router.addHandler<HttpMethod::GET>(joinRoute(authPrefix, "/me"), authMeHandler);
+        router.addHandler<HttpMethod::PUT>(joinRoute(authPrefix, "/profile"), authUpdateProfileHandler);
+        router.addHandler<HttpMethod::PUT>(joinRoute(authPrefix, "/password"), authUpdatePasswordHandler);
+        router.addHandler<HttpMethod::PUT>(joinRoute(authPrefix, "/notifications"), authUpdateNotificationsHandler);
+        router.addHandler<HttpMethod::DELETE>(joinRoute(authPrefix, "/account"), authDeleteAccountHandler);
+    }
 
     // 静态文件服务配置
     StaticFileConfig staticConfig;
@@ -630,22 +1142,23 @@ int main(int argc, char* argv[]) {
     staticConfig.setSmallFileThreshold(64 * 1024);    // 64KB
     staticConfig.setLargeFileThreshold(1024 * 1024);  // 1MB
 
-    // 挂载静态文件目录
-    if (!router.mount("/", staticDir, staticConfig)) {
-        LogError("Failed to mount static directory: {}", staticDir);
-        LogInfo("Make sure the frontend directory exists.");
-        return 1;
+    // 可选：仅当指定目录时挂载静态文件
+    if (!staticDir.empty()) {
+        if (!std::filesystem::exists(staticDir) || !std::filesystem::is_directory(staticDir)) {
+            LogWarn("Static directory not found, static mount skipped: {}", staticDir);
+        } else {
+            router.mount("/", staticDir, staticConfig);
+            LogInfo("Static files: {}", staticDir);
+        }
+    } else {
+        LogInfo("Static files: disabled");
     }
-
-    LogInfo("Static files: {}", staticDir);
     LogInfo("API endpoints:");
-    LogInfo("  GET /api/health");
-    LogInfo("  GET /api/projects");
-    LogInfo("  GET /api/projects/:id");
-    LogInfo("  GET /api/posts");
-    LogInfo("  GET /api/posts/:id");
-    LogInfo("  GET /api/docs");
-    LogInfo("  GET /api/docs/:id");
+    LogInfo("  GET /health, /projects, /projects/:id, /posts, /posts/:id, /docs, /docs/:id");
+    LogInfo("  POST /auth/login, /auth/register, /auth/refresh, /auth/logout");
+    LogInfo("  GET /auth/me");
+    LogInfo("  PUT /auth/profile, /auth/password, /auth/notifications");
+    LogInfo("  DELETE /auth/account");
     LogInfo("Starting server on {}:{}", host, port);
     LogInfo("============================================");
 

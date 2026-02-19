@@ -39,10 +39,11 @@ service/ai/
 ├── README.md                 # 本文档
 ├── requirements.txt          # Python 依赖
 ├── Makefile                  # 常用命令
-├── Dockerfile                # Docker 构建
-├── docker-compose.yml        # Docker Compose
 ├── .env.example              # 环境变量模板
 ├── .gitignore
+├── docker/
+│   ├── Dockerfile            # Docker 构建
+│   └── docker-compose.yml    # Docker Compose
 ├── scripts/
 │   ├── build_index.py        # 构建向量索引
 │   ├── install_linux.sh      # Linux 一键安装脚本

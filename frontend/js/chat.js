@@ -1,4 +1,4 @@
-const AI_API_BASE = 'http://localhost:8000';
+const AI_API_BASE = '/ai';
 
 class ChatApp {
     constructor() {

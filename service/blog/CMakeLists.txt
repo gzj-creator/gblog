@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(galay-blog VERSION 1.0.0 LANGUAGES CXX)
 
-# C++20 标准
-set(CMAKE_CXX_STANDARD 20)
+# C++23 标准（依赖 std::expected）
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -66,7 +66,7 @@ if(IOURING_LIB)
 endif()
 
 # 测试程序
-option(BUILD_TESTS "Build test programs" ON)
+option(BUILD_TESTS "Build test programs" OFF)
 if(BUILD_TESTS AND EXISTS ${CMAKE_SOURCE_DIR}/test)
     file(GLOB TEST_SOURCES "test/*.cc")
     foreach(TEST_SOURCE ${TEST_SOURCES})

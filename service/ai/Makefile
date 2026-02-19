@@ -19,13 +19,13 @@ test:
 	python scripts/test_api.py
 
 docker-build:
-	docker compose build
+	docker compose -f docker/docker-compose.yml build
 
 docker-up:
-	docker compose up -d
+	docker compose -f docker/docker-compose.yml up -d
 
 docker-down:
-	docker compose down
+	docker compose -f docker/docker-compose.yml down
 
 clean:
 	rm -rf vector_store __pycache__ src/__pycache__ src/**/__pycache__

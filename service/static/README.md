@@ -58,8 +58,9 @@ service/static/config/static-server.conf
 
 ```text
 proxy.enabled=true
-proxy.route=/api,127.0.0.1,8080,http
-proxy.route=/auth,127.0.0.1,8081,http
+proxy.route=/api,service,8080,http
+proxy.route=/auth,service,8080,http
+proxy.route=/ai,ai,8000,http
 ```
 
 支持两种多路由写法：
@@ -70,7 +71,7 @@ proxy.route=<prefix>,<host>,<port>,<mode>
 
 # 2) 索引键
 proxy.route.1.prefix=/api
-proxy.route.1.upstream_host=127.0.0.1
+proxy.route.1.upstream_host=service
 proxy.route.1.upstream_port=8080
 proxy.route.1.mode=http
 ```
@@ -85,11 +86,11 @@ STATIC_CONFIG_PATH=/custom/path/static-server.conf
 
 ```text
 # 多路由（优先）
-API_PROXY_ROUTES=/api,127.0.0.1,8080,http;/auth,127.0.0.1,8081,http
+API_PROXY_ROUTES=/api,service,8080,http;/auth,service,8080,http;/ai,ai,8000,http
 
 # 单路由（兼容旧配置）
 API_PROXY_ROUTE_PREFIX=/api
-API_PROXY_UPSTREAM_HOST=127.0.0.1
+API_PROXY_UPSTREAM_HOST=service
 API_PROXY_UPSTREAM_PORT=8080
 API_PROXY_MODE=http
 ```

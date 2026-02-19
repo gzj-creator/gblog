@@ -25,6 +25,11 @@ frontend/data/
 # Service runtime / build artifacts
 service/static/server
 service/static/.env
+service/bin/
+service/logs/
+service/blog/build/
+service/blog/bin/
+service/blog/logs/
 service/**/__pycache__/
 service/**/venv/
 service/**/.venv/

@@ -9,7 +9,7 @@ BUILD_DIR="$PROJECT_DIR/build"
 # 默认参数
 HOST="0.0.0.0"
 PORT=8080
-STATIC_DIR="$PROJECT_DIR/../frontend"
+STATIC_DIR="$PROJECT_DIR/../../frontend"
 
 # 解析参数
 while [[ $# -gt 0 ]]; do

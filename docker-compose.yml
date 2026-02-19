@@ -1,11 +1,42 @@
 version: "3.8"
 
 services:
+  ai:
+    build:
+      context: ./service/ai
+      dockerfile: docker/Dockerfile
+    container_name: gblob-ai
+    env_file:
+      - ./service/ai/.env
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+      GALAY_DOCS_ROOT_PATH: ${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}
+    volumes:
+      - ./service/ai/vector_store:/app/vector_store
+      - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
+    restart: unless-stopped
+
+  service:
+    image: ubuntu-24.04:galay-web-1.0
+    container_name: gblob-service
+    working_dir: /app
+    command: ["./bin/blog-server", "-h", "0.0.0.0", "-p", "8080"]
+    environment:
+      LD_LIBRARY_PATH: /usr/local/lib
+    volumes:
+      - ./service/bin:/app/bin:ro
+      - ./service/logs:/app/logs
+    restart: unless-stopped
+
   static:
     image: ubuntu-24.04:galay-web-1.0
     container_name: gblob-static
     working_dir: /app
     command: [./bin/static-server]
+    depends_on:
+      - ai
+      - service
     environment:
       STATIC_HOST: 0.0.0.0
       STATIC_PORT: 80
@@ -16,7 +47,7 @@ services:
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
       API_PROXY_ROUTES: ${API_PROXY_ROUTES:-}
       API_PROXY_ROUTE_PREFIX: ${API_PROXY_ROUTE_PREFIX:-/api}
-      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-127.0.0.1}
+      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-service}
       API_PROXY_UPSTREAM_PORT: ${API_PROXY_UPSTREAM_PORT:-8080}
       API_PROXY_MODE: ${API_PROXY_MODE:-http}
       LD_LIBRARY_PATH: /usr/local/lib

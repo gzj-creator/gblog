@@ -25,8 +25,8 @@ services:
     environment:
       LD_LIBRARY_PATH: /usr/local/lib
     volumes:
-      - ./service/bin:/app/bin:ro
-      - ./service/logs:/app/logs
+      - ./service/blog/bin:/app/bin:ro
+      - ./service/blog/logs:/app/logs
     restart: unless-stopped
 
   static:

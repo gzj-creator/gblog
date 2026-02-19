@@ -11,7 +11,7 @@ docker buildx build \
   --build-arg STATIC_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
   --build-arg GALAY_KERNEL_BACKEND=epoll \
   --target artifact \
-  --output type=local,dest=/home/ubuntu/service/gblob/static/bin \
+  --output type=local,dest=/home/ubuntu/service/gblob/service/static/bin \
   -f docker/Dockerfile \
   .
 ```
@@ -19,7 +19,7 @@ docker buildx build \
 导出结果：
 
 ```text
-/home/ubuntu/service/gblob/static/bin/static-server
+/home/ubuntu/service/gblob/service/static/bin/static-server
 ```
 
 ## 本地 CMake 构建
@@ -58,8 +58,8 @@ service/static/config/static-server.conf
 
 ```text
 proxy.enabled=true
-proxy.route=/api,service,8080,http
-proxy.route=/auth,service,8080,http
+proxy.route=/api,backend,8080,http
+proxy.route=/auth,backend,8080,http
 proxy.route=/ai,ai,8000,http
 ```
 
@@ -71,7 +71,7 @@ proxy.route=<prefix>,<host>,<port>,<mode>
 
 # 2) 索引键
 proxy.route.1.prefix=/api
-proxy.route.1.upstream_host=service
+proxy.route.1.upstream_host=backend
 proxy.route.1.upstream_port=8080
 proxy.route.1.mode=http
 ```
@@ -86,11 +86,11 @@ STATIC_CONFIG_PATH=/custom/path/static-server.conf
 
 ```text
 # 多路由（优先）
-API_PROXY_ROUTES=/api,service,8080,http;/auth,service,8080,http;/ai,ai,8000,http
+API_PROXY_ROUTES=/api,backend,8080,http;/auth,backend,8080,http;/ai,ai,8000,http
 
 # 单路由（兼容旧配置）
 API_PROXY_ROUTE_PREFIX=/api
-API_PROXY_UPSTREAM_HOST=service
+API_PROXY_UPSTREAM_HOST=backend
 API_PROXY_UPSTREAM_PORT=8080
 API_PROXY_MODE=http
 ```

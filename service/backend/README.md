@@ -33,7 +33,7 @@
 
 # 或手动构建
 mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake .. -DCMAKE_BUILD_TYPE=Release -DGALAY_KERNEL_BACKEND=epoll
 make -j$(nproc)
 ```
 
@@ -44,7 +44,7 @@ make -j$(nproc)
 ./scripts/S1-RunServer.sh
 
 # 或直接运行
-./build/bin/blog-server -p 8080 -s ../../frontend
+./build/bin/backend-server -p 8080 -s ../../frontend
 ```
 
 ### 命令行参数
@@ -62,12 +62,25 @@ make -j$(nproc)
 ./scripts/S2-RunTests.sh
 ```
 
+## 导出二进制（Docker）
+
+```bash
+docker buildx build \
+  --build-arg BACKEND_BASE_IMAGE=ubuntu-24.04:galay-web-1.0 \
+  --build-arg GALAY_KERNEL_BACKEND=epoll \
+  --target artifact \
+  --output type=local,dest=/home/ubuntu/service/gblob/service/backend/bin \
+  -f docker/Dockerfile \
+  .
+```
+
 ## 项目结构
 
-```
-service/blog/
+```text
+service/backend/
 ├── BlogServer.cc       # 主程序
 ├── CMakeLists.txt      # 构建配置
+├── docker/             # Docker 构建文件
 ├── README.md           # 项目说明
 ├── todo/               # 待办列表
 ├── docs/               # 文档

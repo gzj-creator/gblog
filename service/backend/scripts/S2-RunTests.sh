@@ -22,7 +22,7 @@ fi
 cd "$BUILD_DIR"
 
 # 启动服务器（后台运行）
-SERVER_BIN="$BUILD_DIR/bin/blog-server"
+SERVER_BIN="$BUILD_DIR/bin/backend-server"
 STATIC_DIR="$PROJECT_DIR/../../frontend"
 
 if [ ! -f "$SERVER_BIN" ]; then

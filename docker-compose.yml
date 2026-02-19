@@ -17,26 +17,26 @@ services:
       - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
     restart: unless-stopped
 
-  service:
+  backend:
     image: ubuntu-24.04:galay-web-1.0
-    container_name: gblob-service
+    container_name: gblob-backend
     working_dir: /app
-    command: ["./bin/blog-server", "-h", "0.0.0.0", "-p", "8080"]
+    command: ["./bin/backend-server", "-h", "0.0.0.0", "-p", "8080"]
     environment:
       LD_LIBRARY_PATH: /usr/local/lib
     volumes:
-      - ./service/blog/bin:/app/bin:ro
-      - ./service/blog/logs:/app/logs
+      - ./service/backend/bin:/app/bin:ro
+      - ./service/backend/logs:/app/logs
     restart: unless-stopped
 
   static:
     image: ubuntu-24.04:galay-web-1.0
     container_name: gblob-static
     working_dir: /app
-    command: [./bin/static-server]
+    command: ["./bin/static-server"]
     depends_on:
       - ai
-      - service
+      - backend
     environment:
       STATIC_HOST: 0.0.0.0
       STATIC_PORT: 80
@@ -47,15 +47,15 @@ services:
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
       API_PROXY_ROUTES: ${API_PROXY_ROUTES:-}
       API_PROXY_ROUTE_PREFIX: ${API_PROXY_ROUTE_PREFIX:-/api}
-      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-service}
+      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-backend}
       API_PROXY_UPSTREAM_PORT: ${API_PROXY_UPSTREAM_PORT:-8080}
       API_PROXY_MODE: ${API_PROXY_MODE:-http}
       LD_LIBRARY_PATH: /usr/local/lib
     ports:
       - "80:80"
     volumes:
-      - ./static/bin:/app/bin:ro
-      - ./static/logs:/app/logs
-      - ./static/config:/app/config:ro
-      - ./static/frontend:/app/frontend:ro
+      - ./service/static/bin:/app/bin:ro
+      - ./service/static/logs:/app/logs
+      - ./service/static/config:/app/config:ro
+      - ./frontend:/app/frontend:ro
     restart: unless-stopped

@@ -19,10 +19,10 @@ blog/
 │   ├── register.html  # 注册页面
 │   └── profile.html   # 个人中心
 ├── service/           # 服务目录
-│   ├── blog/          # C++ 博客 API 服务（原 backend）
+│   ├── backend/       # C++ 博客 API 服务
 │   ├── static/        # 静态站点 + 反向代理
 │   └── ai/            # AI 问答服务
-└── docker-compose.yml # 容器编排（static + service）
+└── docker-compose.yml # 容器编排（static + backend + ai）
 ```
 
 ## 技术栈
@@ -69,7 +69,7 @@ blog/
 
 ```bash
 # 进入 API 服务目录
-cd service/blog
+cd service/backend
 
 # 编译
 mkdir build && cd build
@@ -77,7 +77,7 @@ cmake ..
 make -j$(nproc)
 
 # 运行
-./blog-server -p 8080
+./bin/backend-server -p 8080
 ```
 
 ### 命令行参数
@@ -103,10 +103,10 @@ docker compose up -d
 
 ```bash
 # 应用配置
-kubectl apply -f service/blog/k8s/
+kubectl apply -f service/backend/k8s/
 
 # 查看状态
-kubectl get pods -l app=blog-service
+kubectl get pods -l app=backend-service
 ```
 
 ## 性能指标

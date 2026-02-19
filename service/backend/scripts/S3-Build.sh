@@ -81,5 +81,5 @@ fi
 echo "============================================"
 echo "Build completed successfully!"
 echo "============================================"
-echo "Binary: $BUILD_DIR/bin/blog-server"
+echo "Binary: $BUILD_DIR/bin/backend-server"
 echo "============================================"

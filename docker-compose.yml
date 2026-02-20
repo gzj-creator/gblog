@@ -18,7 +18,7 @@ services:
     volumes:
       - ./service/ai/data:/app/vector_store
       - ./service/ai/logs:/app/logs
-      - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
+      - ${GALAY_DOCS_ROOT_PATH:-./repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
     network_mode: host
     restart: unless-stopped
 

@@ -42,7 +42,9 @@ class ChatService:
             messages = self._build_messages(message, docs, session_id)
 
             response = self._llm.invoke(messages)
-            answer = response.content
+            answer = _extract_message_text(response)
+            if not answer.strip():
+                answer = "抱歉，模型返回了空内容，请稍后重试。"
 
             self._append_history(session_id, message, answer)
 
@@ -67,11 +69,23 @@ class ChatService:
 
             full_answer = []
             async for chunk in self._llm.astream(messages):
-                if chunk.content:
-                    full_answer.append(chunk.content)
-                    yield {"content": chunk.content}
+                text = _extract_message_text(chunk)
+                if text:
+                    full_answer.append(text)
+                    yield {"content": text}
 
             answer = "".join(full_answer)
+            if not answer.strip():
+                # 部分 OpenAI 兼容实现可能在 stream 中不给 content，兜底一次同步调用。
+                fallback = self._llm.invoke(messages)
+                answer = _extract_message_text(fallback).strip()
+                if answer:
+                    yield {"content": answer}
+
+            if not answer.strip():
+                answer = "抱歉，模型返回了空内容，请稍后重试。"
+                yield {"content": answer}
+
             self._append_history(session_id, message, answer)
 
             yield {"done": True, "sources": sources}
@@ -168,3 +182,43 @@ def _extract_sources(documents: list) -> List[Dict[str, str]]:
             })
             seen.add(key)
     return sources
+
+
+def _extract_message_text(message: Any) -> str:
+    """兼容不同 OpenAI 兼容服务的消息结构，尽可能提取文本内容。"""
+    if message is None:
+        return ""
+
+    content = getattr(message, "content", message)
+    additional = getattr(message, "additional_kwargs", {}) or {}
+    return (
+        _coerce_text(content)
+        or _coerce_text(additional.get("content"))
+        or _coerce_text(additional.get("reasoning_content"))
+        or ""
+    )
+
+
+def _coerce_text(value: Any) -> str:
+    if value is None:
+        return ""
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, list):
+        parts: List[str] = []
+        for item in value:
+            piece = _coerce_text(item)
+            if piece:
+                parts.append(piece)
+        return "".join(parts)
+
+    if isinstance(value, dict):
+        for key in ("text", "content", "reasoning_content"):
+            piece = _coerce_text(value.get(key))
+            if piece:
+                return piece
+        return ""
+
+    return str(value)

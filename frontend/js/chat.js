@@ -204,41 +204,94 @@ class ChatApp {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
+        let gotContent = false;
 
         while (true) {
             const { done, value } = await this._readChunkWithTimeout(reader, STREAM_IDLE_TIMEOUT_MS);
-            if (done) break;
+            if (done) {
+                this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+                    fullText = updatedText;
+                    gotContent = gotContent || Boolean(fullText);
+                });
+                break;
+            }
 
             buffer += decoder.decode(value, { stream: true });
+            buffer = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+                fullText = updatedText;
+                gotContent = gotContent || Boolean(fullText);
+            });
+        }
 
-            // 解析 SSE 事件
-            const lines = buffer.split('\n');
-            buffer = lines.pop(); // 保留未完成的行
+        if (!gotContent) {
+            const fallback = await this._callNonStreamAPI(message);
+            contentDiv.innerHTML = this.formatMessage(fallback.response);
+            if (fallback.sources && fallback.sources.length > 0) {
+                this.addSources(fallback.sources);
+            }
+            this.scrollToBottom();
+        }
+    }
 
-            for (const line of lines) {
-                if (!line.startsWith('data: ')) continue;
+    _consumeSSEBuffer(buffer, contentDiv, onTextUpdate) {
+        const lines = buffer.split('\n');
+        const tail = lines.pop() || '';
+        let fullText = contentDiv.textContent || '';
 
-                try {
-                    const data = JSON.parse(line.slice(6));
+        for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
+            if (!line.startsWith('data:')) continue;
+            const payload = line.replace(/^data:\s*/, '');
+            if (!payload) continue;
 
-                    if (data.content) {
-                        fullText += data.content;
-                        contentDiv.innerHTML = this.formatMessage(fullText);
-                        this.scrollToBottom();
-                    }
-
-                    if (data.done && data.sources && data.sources.length > 0) {
-                        this.addSources(data.sources);
-                    }
-
-                    if (data.error) {
-                        contentDiv.innerHTML = this.formatMessage('抱歉，生成回答时出错了。');
-                    }
-                } catch (e) {
-                    // 忽略解析错误
+            try {
+                const data = JSON.parse(payload);
+                if (data.content) {
+                    fullText += String(data.content);
+                    contentDiv.innerHTML = this.formatMessage(fullText);
+                    this.scrollToBottom();
+                    onTextUpdate(fullText);
                 }
+                if (data.done && data.sources && data.sources.length > 0) {
+                    this.addSources(data.sources);
+                }
+                if (data.error) {
+                    contentDiv.innerHTML = this.formatMessage('抱歉，生成回答时出错了。');
+                    onTextUpdate(contentDiv.textContent || '');
+                }
+            } catch (e) {
+                // ignore malformed chunk
             }
         }
+        return tail;
+    }
+
+    async _callNonStreamAPI(message) {
+        const response = await this._fetchWithTimeout(
+            `${AI_API_BASE}/api/chat`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message,
+                    session_id: this.sessionId,
+                    use_memory: true,
+                }),
+            },
+            STREAM_CONNECT_TIMEOUT_MS,
+            '连接 AI 服务超时'
+        );
+
+        if (!response.ok) {
+            const detail = (await response.text()).trim() || `HTTP ${response.status}`;
+            throw new Error(detail);
+        }
+
+        const body = await response.json();
+        return {
+            response: body.response || '抱歉，未返回有效内容。',
+            sources: Array.isArray(body.sources) ? body.sources : [],
+        };
     }
 
     _loadSessionId() {

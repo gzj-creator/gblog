@@ -16,6 +16,7 @@ RUN_EVAL=false
 MIN_PASS_RATE="0.70"
 GENERATE_DOCS=false
 DOCS_ROOT_OVERRIDE=""
+DOCS_ROOT_EFFECTIVE=""
 
 usage() {
   cat <<'EOF'
@@ -31,7 +32,7 @@ Options:
   --run-eval             Run KB evaluation after rebuild
   --min-pass-rate <v>    Pass threshold for evaluation (default: 0.70)
   --generate-docs        Ask rebuild_kb.py to generate galay docs before indexing
-  --docs-root <path>     Override GALAY_DOCS_ROOT_PATH for compose up/build
+  --docs-root <path>     Override GALAY_DOCS_ROOT_PATH (default: <project>/repos)
   --help                 Show this help
 
 Environment:
@@ -97,13 +98,42 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
   exit 1
 fi
 
-run_compose() {
-  if [[ -n "${DOCS_ROOT_OVERRIDE}" ]]; then
-    GALAY_DOCS_ROOT_PATH="${DOCS_ROOT_OVERRIDE}" docker compose -f "${COMPOSE_FILE}" "$@"
-  else
-    docker compose -f "${COMPOSE_FILE}" "$@"
+resolve_docs_root() {
+  local raw="${DOCS_ROOT_OVERRIDE:-${GALAY_DOCS_ROOT_PATH:-${PROJECT_DIR}/repos}}"
+  raw="${raw/#\~/${HOME}}"
+  if [[ "${raw}" != /* ]]; then
+    raw="${PROJECT_DIR}/${raw}"
+  fi
+  DOCS_ROOT_EFFECTIVE="${raw}"
+}
+
+validate_docs_root() {
+  if [[ ! -d "${DOCS_ROOT_EFFECTIVE}" ]]; then
+    if [[ "${REBUILD_KB}" == "true" ]]; then
+      echo "[ERROR] Docs root not found: ${DOCS_ROOT_EFFECTIVE}" >&2
+      echo "[ERROR] Use --docs-root <path> or set GALAY_DOCS_ROOT_PATH." >&2
+      exit 1
+    fi
+    echo "[WARN] Docs root not found: ${DOCS_ROOT_EFFECTIVE}"
+    return
+  fi
+
+  local subdir_count
+  subdir_count="$(find "${DOCS_ROOT_EFFECTIVE}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d '[:space:]')"
+  echo "[INFO] Docs root (host): ${DOCS_ROOT_EFFECTIVE} (subdirs=${subdir_count})"
+  if [[ "${REBUILD_KB}" == "true" && "${subdir_count}" == "0" ]]; then
+    echo "[ERROR] No repository subdirectories found under docs root." >&2
+    echo "[ERROR] Expected layout like: <docs-root>/galay-http, <docs-root>/galay-kernel ..." >&2
+    exit 1
   fi
 }
+
+run_compose() {
+  GALAY_DOCS_ROOT_PATH="${DOCS_ROOT_EFFECTIVE}" docker compose -f "${COMPOSE_FILE}" "$@"
+}
+
+resolve_docs_root
+validate_docs_root
 
 echo "============================================"
 echo "AI One-Click Deploy"
@@ -112,6 +142,7 @@ echo "Project: ${PROJECT_DIR}"
 echo "Compose: ${COMPOSE_FILE}"
 echo "Service: ${SERVICE_NAME}"
 echo "Container: ${CONTAINER_NAME}"
+echo "Docs root: ${DOCS_ROOT_EFFECTIVE}"
 echo "Build: ${BUILD}"
 echo "No cache: ${NO_CACHE}"
 echo "Force recreate: ${FORCE_RECREATE}"
@@ -153,6 +184,8 @@ else
 fi
 
 if [[ "${REBUILD_KB}" == "true" ]]; then
+  echo "[INFO] Checking docs mount in container..."
+  docker exec "${CONTAINER_NAME}" sh -lc 'echo "GALAY_DOCS_ROOT_PATH=${GALAY_DOCS_ROOT_PATH}"; ls -1 "${GALAY_DOCS_ROOT_PATH}" | head -n 20'
   rebuild_cmd="cd /app && python scripts/rebuild_kb.py --force"
   if [[ "${GENERATE_DOCS}" == "true" ]]; then
     rebuild_cmd+=" --generate-docs"

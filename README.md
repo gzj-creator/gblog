@@ -99,6 +99,8 @@ make -j$(nproc)
 docker compose up -d
 ```
 
+AI 知识库文档默认从项目目录 `./repos` 挂载到容器内 `/docs/repos`。
+
 如果页面一直转圈，可先做连通性检查：
 
 ```bash

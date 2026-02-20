@@ -205,22 +205,34 @@ class ChatApp {
         const decoder = new TextDecoder();
         let buffer = '';
         let gotContent = false;
+        let streamComplete = false;
 
         while (true) {
             const { done, value } = await this._readChunkWithTimeout(reader, STREAM_IDLE_TIMEOUT_MS);
             if (done) {
-                this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+                const flushResult = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
                     fullText = updatedText;
-                    gotContent = gotContent || Boolean(fullText);
+                    gotContent = gotContent || Boolean((fullText || '').trim());
                 });
+                streamComplete = streamComplete || flushResult.streamComplete;
                 break;
             }
 
             buffer += decoder.decode(value, { stream: true });
-            buffer = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+            const parseResult = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
                 fullText = updatedText;
-                gotContent = gotContent || Boolean(fullText);
+                gotContent = gotContent || Boolean((fullText || '').trim());
             });
+            buffer = parseResult.tail;
+            streamComplete = streamComplete || parseResult.streamComplete;
+            if (streamComplete) {
+                try {
+                    await reader.cancel();
+                } catch (e) {
+                    // ignore cancellation errors
+                }
+                break;
+            }
         }
 
         if (!gotContent) {
@@ -237,6 +249,7 @@ class ChatApp {
         const lines = buffer.split('\n');
         const tail = lines.pop() || '';
         let fullText = contentDiv.textContent || '';
+        let streamComplete = false;
 
         for (const rawLine of lines) {
             const line = rawLine.trimEnd();
@@ -246,8 +259,9 @@ class ChatApp {
 
             try {
                 const data = JSON.parse(payload);
-                if (data.content) {
-                    fullText += String(data.content);
+                const chunkText = this._coerceText(data.content);
+                if (chunkText) {
+                    fullText += chunkText;
                     contentDiv.innerHTML = this.formatMessage(fullText);
                     this.scrollToBottom();
                     onTextUpdate(fullText);
@@ -255,15 +269,19 @@ class ChatApp {
                 if (data.done && data.sources && data.sources.length > 0) {
                     this.addSources(data.sources);
                 }
+                if (data.done) {
+                    streamComplete = true;
+                }
                 if (data.error) {
                     contentDiv.innerHTML = this.formatMessage('抱歉，生成回答时出错了。');
                     onTextUpdate(contentDiv.textContent || '');
+                    streamComplete = true;
                 }
             } catch (e) {
                 // ignore malformed chunk
             }
         }
-        return tail;
+        return { tail, streamComplete };
     }
 
     async _callNonStreamAPI(message) {
@@ -288,8 +306,9 @@ class ChatApp {
         }
 
         const body = await response.json();
+        const responseText = this._coerceText(body.response).trim();
         return {
-            response: body.response || '抱歉，未返回有效内容。',
+            response: responseText || '抱歉，未返回可显示内容。',
             sources: Array.isArray(body.sources) ? body.sources : [],
         };
     }
@@ -308,6 +327,18 @@ class ChatApp {
         const message = String(error.message).replace(/\s+/g, ' ').trim();
         if (!message) return fallback;
         return message.slice(0, 180);
+    }
+
+    _coerceText(value) {
+        if (value === null || value === undefined) return '';
+        if (typeof value === 'string') return value;
+        if (Array.isArray(value)) {
+            return value.map(item => this._coerceText(item)).join('');
+        }
+        if (typeof value === 'object') {
+            return this._coerceText(value.text || value.content || value.reasoning_content || '');
+        }
+        return String(value);
     }
 
     async _fetchWithTimeout(url, options, timeoutMs, timeoutMessage) {

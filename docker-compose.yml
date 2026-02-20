@@ -51,7 +51,6 @@ services:
       STATIC_LOG_FILE: static-server.log
       STATIC_CONFIG_PATH: /app/config/static-server.conf
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
-      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-/api,127.0.0.1,8080,http;/auth,127.0.0.1,8080,http;/ai,127.0.0.1,8000,http}
       LD_LIBRARY_PATH: /usr/local/lib
     network_mode: host
     volumes:

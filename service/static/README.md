@@ -66,7 +66,7 @@ service/static/config/static-server.conf
 proxy.enabled=true
 proxy.route=/api,backend,8080,http
 proxy.route=/auth,backend,8080,http
-proxy.route=/ai,ai,8000,http
+proxy.route=/ai,ai,8000,raw
 ```
 
 支持两种多路由写法：
@@ -92,11 +92,37 @@ STATIC_CONFIG_PATH=/custom/path/static-server.conf
 
 ```text
 # 多路由（优先）
-API_PROXY_ROUTES=/api,backend,8080,http;/auth,backend,8080,http;/ai,ai,8000,http
+API_PROXY_ROUTES=/api,backend,8080,http;/auth,backend,8080,http;/ai,ai,8000,raw
 
 # 单路由（兼容旧配置）
 API_PROXY_ROUTE_PREFIX=/api
 API_PROXY_UPSTREAM_HOST=backend
 API_PROXY_UPSTREAM_PORT=8080
 API_PROXY_MODE=http
+```
+
+## Local Stream Proxy Demo (No Docker)
+
+This demo starts:
+
+- a mock AI SSE upstream (`127.0.0.1:19000`)
+- static-server in `raw` mode (`127.0.0.1:19080`)
+- static-server in `http` mode (`127.0.0.1:19081`)
+
+Then it probes `/ai/api/chat/stream` on both modes and prints per-line arrival timestamps.
+
+```bash
+bash service/static/scripts/demo-stream-proxy.sh
+```
+
+Optional environment variables:
+
+```text
+STATIC_BIN=/absolute/path/to/static-server
+UPSTREAM_PORT=19000
+RAW_PORT=19080
+HTTP_PORT=19081
+MOCK_CHUNK_DELAY=0.35
+MOCK_LINGER_SECONDS=0
+PROBE_TIMEOUT=8
 ```

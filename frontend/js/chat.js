@@ -1,4 +1,6 @@
 const AI_API_BASE = '/ai';
+const STREAM_CONNECT_TIMEOUT_MS = 15000;
+const STREAM_IDLE_TIMEOUT_MS = 45000;
 
 class ChatApp {
     constructor() {
@@ -150,7 +152,9 @@ class ChatApp {
     }
 
     async callStreamAPI(message) {
-        const response = await fetch(`${AI_API_BASE}/api/chat/stream`, {
+        const response = await this._fetchWithTimeout(
+            `${AI_API_BASE}/api/chat/stream`,
+            {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -158,7 +162,10 @@ class ChatApp {
                 session_id: this.sessionId,
                 use_memory: true,
             }),
-        });
+            },
+            STREAM_CONNECT_TIMEOUT_MS,
+            '连接 AI 服务超时'
+        );
 
         if (!response.ok) {
             let detail = `HTTP ${response.status}`;
@@ -191,12 +198,15 @@ class ChatApp {
         this.chatMessages.appendChild(messageDiv);
 
         let fullText = '';
+        if (!response.body) {
+            throw new Error('AI 流式响应不可用');
+        }
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
 
         while (true) {
-            const { done, value } = await reader.read();
+            const { done, value } = await this._readChunkWithTimeout(reader, STREAM_IDLE_TIMEOUT_MS);
             if (done) break;
 
             buffer += decoder.decode(value, { stream: true });
@@ -245,6 +255,36 @@ class ChatApp {
         const message = String(error.message).replace(/\s+/g, ' ').trim();
         if (!message) return fallback;
         return message.slice(0, 180);
+    }
+
+    async _fetchWithTimeout(url, options, timeoutMs, timeoutMessage) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } catch (error) {
+            if (error && error.name === 'AbortError') {
+                throw new Error(timeoutMessage || '请求超时');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timer);
+        }
+    }
+
+    _readChunkWithTimeout(reader, timeoutMs) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('AI 响应超时，请稍后重试')), timeoutMs);
+            reader.read()
+                .then(result => {
+                    clearTimeout(timer);
+                    resolve(result);
+                })
+                .catch(error => {
+                    clearTimeout(timer);
+                    reject(error);
+                });
+        });
     }
 }
 

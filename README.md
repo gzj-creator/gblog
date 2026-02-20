@@ -107,7 +107,7 @@ docker compose exec static sh -lc 'echo "$API_PROXY_ROUTES"'
 
 # 2) host 模式：backend / ai 都应可访问
 docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8080/api/health'
-docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:18000/health'
+docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8000/health'
 
 # 3) 查看三服务日志
 docker compose logs --tail=200 static backend ai

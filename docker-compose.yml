@@ -6,7 +6,7 @@ services:
       context: ./service/ai
       dockerfile: docker/Dockerfile
     container_name: gblob-ai
-    command: ["python", "scripts/run_server.py", "--host", "0.0.0.0", "--port", "18000"]
+    command: ["python", "scripts/run_server.py", "--host", "0.0.0.0", "--port", "8000"]
     env_file:
       - ./service/ai/.env
     environment:
@@ -51,7 +51,7 @@ services:
       STATIC_LOG_FILE: static-server.log
       STATIC_CONFIG_PATH: /app/config/static-server.conf
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
-      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-/api,127.0.0.1,8080,http;/auth,127.0.0.1,8080,http;/ai,127.0.0.1,18000,http}
+      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-/api,127.0.0.1,8080,http;/auth,127.0.0.1,8080,http;/ai,127.0.0.1,8000,http}
       LD_LIBRARY_PATH: /usr/local/lib
     network_mode: host
     volumes:

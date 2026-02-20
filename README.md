@@ -105,8 +105,14 @@ docker compose up -d
 # 1) 检查 static 的代理路由是否生效
 docker compose exec static sh -lc 'echo "$API_PROXY_ROUTES"'
 
-# 2) host 模式：应能访问 127.0.0.1
+# 2) host 模式：backend / ai 都应可访问
 docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8080/api/health'
+docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:18000/health'
+
+# 3) 查看三服务日志
+docker compose logs --tail=200 static backend ai
+tail -f service/static/logs/static-server.log
+tail -f service/ai/logs/ai-service.log
 ```
 
 ## Kubernetes 部署

@@ -3,6 +3,7 @@ import json
 import sys
 import os
 from datetime import datetime
+from logging.handlers import RotatingFileHandler
 
 
 class JSONFormatter(logging.Formatter):
@@ -57,6 +58,26 @@ def setup_logging(level: str = "INFO") -> None:
     root.setLevel(log_level)
     root.handlers.clear()
     root.addHandler(handler)
+
+    # 可选文件日志（默认写入 /app/logs/ai-service.log）
+    log_dir = os.getenv("LOG_DIR", "/app/logs").strip()
+    log_file = os.getenv("LOG_FILE", "ai-service.log").strip()
+    if log_dir and log_file:
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            max_bytes = int(os.getenv("LOG_MAX_BYTES", "10485760"))  # 10MB
+            backup_count = int(os.getenv("LOG_BACKUP_COUNT", "5"))
+            file_handler = RotatingFileHandler(
+                filename=os.path.join(log_dir, log_file),
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(JSONFormatter())
+            root.addHandler(file_handler)
+        except Exception as e:
+            print(f"[logger] failed to init file logger: {e}", file=sys.stderr)
 
     # 降低第三方库日志级别
     for name in ("httpcore", "httpx", "chromadb", "urllib3"):

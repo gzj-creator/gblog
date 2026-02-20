@@ -43,7 +43,8 @@ class ChatApp {
             await this.callStreamAPI(message);
         } catch (error) {
             this.removeTypingIndicator();
-            this.addMessage('抱歉，服务暂时不可用，请稍后再试。', 'bot');
+            const detail = this._extractErrorDetail(error);
+            this.addMessage(`抱歉，服务暂时不可用：${detail}`, 'bot');
             console.error('Error:', error);
         }
 
@@ -160,7 +161,22 @@ class ChatApp {
         });
 
         if (!response.ok) {
-            throw new Error(`API request failed: ${response.status}`);
+            let detail = `HTTP ${response.status}`;
+            try {
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    const body = await response.json();
+                    detail = body.error || body.detail || body.message || detail;
+                } else {
+                    const text = (await response.text()).trim();
+                    if (text) {
+                        detail = text;
+                    }
+                }
+            } catch (e) {
+                // ignore parse errors
+            }
+            throw new Error(detail);
         }
 
         this.removeTypingIndicator();
@@ -221,6 +237,14 @@ class ChatApp {
 
     _saveSessionId(id) {
         localStorage.setItem('galay_chat_session', id);
+    }
+
+    _extractErrorDetail(error) {
+        const fallback = '请稍后再试';
+        if (!error || !error.message) return fallback;
+        const message = String(error.message).replace(/\s+/g, ' ').trim();
+        if (!message) return fallback;
+        return message.slice(0, 180);
     }
 }
 

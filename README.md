@@ -95,8 +95,18 @@ make -j$(nproc)
 ## Docker 部署
 
 ```bash
-# 启动 static + service
+# 全服务 host 网络（Linux）
 docker compose up -d
+```
+
+如果页面一直转圈，可先做连通性检查：
+
+```bash
+# 1) 检查 static 的代理路由是否生效
+docker compose exec static sh -lc 'echo "$API_PROXY_ROUTES"'
+
+# 2) host 模式：应能访问 127.0.0.1
+docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8080/api/health'
 ```
 
 ## Kubernetes 部署

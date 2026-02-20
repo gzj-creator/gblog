@@ -16,8 +16,7 @@ services:
       - ./service/ai/data:/app/vector_store
       - ./service/ai/logs:/app/logs
       - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
-    ports:
-      - "8000:8000"
+    network_mode: host
     restart: unless-stopped
 
   backend:
@@ -27,8 +26,7 @@ services:
     command: ["./bin/backend-server", "-h", "0.0.0.0", "-p", "8080"]
     environment:
       LD_LIBRARY_PATH: /usr/local/lib
-    ports:
-      - "8080:8080"
+    network_mode: host
     volumes:
       - ./service/backend/bin:/app/bin:ro
       - ./service/backend/logs:/app/logs
@@ -50,11 +48,9 @@ services:
       STATIC_LOG_FILE: static-server.log
       STATIC_CONFIG_PATH: /app/config/static-server.conf
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
+      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-/api,127.0.0.1,8080,http;/auth,127.0.0.1,8080,http;/ai,127.0.0.1,8000,http}
       LD_LIBRARY_PATH: /usr/local/lib
-    ports:
-      - "80:80"
-    extra_hosts:
-      - "host:host-gateway"
+    network_mode: host
     volumes:
       - ./service/static/bin:/app/bin:ro
       - ./service/static/logs:/app/logs

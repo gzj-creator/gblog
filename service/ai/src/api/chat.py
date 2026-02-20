@@ -17,35 +17,35 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
-async def chat(request: ChatRequest, req: Request):
+async def chat(payload: ChatRequest, request: Request):
     """聊天接口"""
     from src.app import get_chat_service
 
-    if not request.message.strip():
+    if not payload.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     svc = get_chat_service()
-    if request.use_memory:
-        result = svc.chat(request.message, request.session_id)
+    if payload.use_memory:
+        result = svc.chat(payload.message, payload.session_id)
     else:
-        result = svc.query(request.message)
+        result = svc.query(payload.message)
 
     return ChatResponse(**result)
 
 
 @router.post("/chat/stream")
 @limiter.limit("30/minute")
-async def chat_stream(request: ChatRequest, req: Request):
+async def chat_stream(payload: ChatRequest, request: Request):
     """流式聊天接口（SSE）"""
     from src.app import get_chat_service
 
-    if not request.message.strip():
+    if not payload.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     svc = get_chat_service()
 
     async def event_generator():
-        async for data in svc.chat_stream(request.message, request.session_id):
+        async for data in svc.chat_stream(payload.message, payload.session_id):
             yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     return StreamingResponse(

@@ -33,3 +33,10 @@ class ChatServiceError(AIServiceError):
 
     def __init__(self, message: str = "Chat service error"):
         super().__init__(message, status_code=500)
+
+
+class ServiceUnavailableError(AIServiceError):
+    """服务未就绪/不可用"""
+
+    def __init__(self, message: str = "Service unavailable"):
+        super().__init__(message, status_code=503)

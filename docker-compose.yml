@@ -46,11 +46,6 @@ services:
       STATIC_LOG_FILE: static-server.log
       STATIC_CONFIG_PATH: /app/config/static-server.conf
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
-      API_PROXY_ROUTES: ${API_PROXY_ROUTES:-}
-      API_PROXY_ROUTE_PREFIX: ${API_PROXY_ROUTE_PREFIX:-/api}
-      API_PROXY_UPSTREAM_HOST: ${API_PROXY_UPSTREAM_HOST:-backend}
-      API_PROXY_UPSTREAM_PORT: ${API_PROXY_UPSTREAM_PORT:-8080}
-      API_PROXY_MODE: ${API_PROXY_MODE:-http}
       LD_LIBRARY_PATH: /usr/local/lib
     ports:
       - "80:80"

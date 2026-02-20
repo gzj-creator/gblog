@@ -19,5 +19,6 @@ class EmbeddingManager:
                 model=settings.EMBEDDING_MODEL,
                 openai_api_key=settings.OPENAI_API_KEY,
                 openai_api_base=settings.OPENAI_API_BASE,
+                model_kwargs={"encoding_format": "float"},
             )
         return self._embeddings

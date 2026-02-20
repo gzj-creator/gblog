@@ -53,7 +53,7 @@ fi
 
 # 检查可执行文件
 SERVER_BIN="$BUILD_DIR/bin/backend-server"
-if [ ! -f "$SERVER_BIN" ]; then
+if [ ! -x "$SERVER_BIN" ]; then
     echo "[ERROR] Server binary not found: $SERVER_BIN"
     echo "[INFO] Please build the project first"
     exit 1

@@ -25,8 +25,8 @@ cd "$BUILD_DIR"
 SERVER_BIN="$BUILD_DIR/bin/backend-server"
 STATIC_DIR="$PROJECT_DIR/../../frontend"
 
-if [ ! -f "$SERVER_BIN" ]; then
-    echo "[ERROR] Server binary not found"
+if [ ! -x "$SERVER_BIN" ]; then
+    echo "[ERROR] Server binary not found: $SERVER_BIN"
     exit 1
 fi
 

@@ -53,6 +53,8 @@ services:
       LD_LIBRARY_PATH: /usr/local/lib
     ports:
       - "80:80"
+    extra_hosts:
+      - "host:host-gateway"
     volumes:
       - ./service/static/bin:/app/bin:ro
       - ./service/static/logs:/app/logs

@@ -5,6 +5,7 @@
 #include <chrono>
 #include <filesystem>
 #include <thread>
+#include <spdlog/spdlog.h>
 #include "galay-http/utils/HttpLogger.h"
 
 using namespace galay::http;
@@ -22,6 +23,10 @@ int main()
             std::filesystem::create_directories(parent);
         }
         HttpLogger::file(logPath.string());
+        if (auto logger = HttpLogger::getInstance()->getSpdlogger(); logger) {
+            // File sink uses async logger; force flush on info to make tail -f timely.
+            logger->flush_on(spdlog::level::info);
+        }
     } catch (...) {
         HttpLogger::console();
     }

@@ -16,6 +16,8 @@ services:
       - ./service/ai/data:/app/vector_store
       - ./service/ai/logs:/app/logs
       - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
+    ports:
+      - "8000:8000"
     restart: unless-stopped
 
   backend:
@@ -25,6 +27,8 @@ services:
     command: ["./bin/backend-server", "-h", "0.0.0.0", "-p", "8080"]
     environment:
       LD_LIBRARY_PATH: /usr/local/lib
+    ports:
+      - "8080:8080"
     volumes:
       - ./service/backend/bin:/app/bin:ro
       - ./service/backend/logs:/app/logs

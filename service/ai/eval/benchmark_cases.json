@@ -1,0 +1,90 @@
+[
+  {
+    "id": "kernel-runtime-role",
+    "query": "galay-kernel 的核心职责是什么？",
+    "search_expected_projects": ["galay-kernel"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["协程", "调度", "异步"],
+    "chat_expected_projects": ["galay-kernel"]
+  },
+  {
+    "id": "ssl-core-components",
+    "query": "galay-ssl 的核心组件有哪些？",
+    "search_expected_projects": ["galay-ssl"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["SslContext", "SslSocket", "TLS"],
+    "chat_expected_projects": ["galay-ssl"]
+  },
+  {
+    "id": "http-protocol-support",
+    "query": "galay-http 支持哪些协议能力？",
+    "search_expected_projects": ["galay-http"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["HTTP/1.1", "HTTP/2", "WebSocket"],
+    "chat_expected_projects": ["galay-http"]
+  },
+  {
+    "id": "rpc-call-modes",
+    "query": "galay-rpc 主要支持哪些调用模式？",
+    "search_expected_projects": ["galay-rpc"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["Unary", "流式", "服务发现"],
+    "chat_expected_projects": ["galay-rpc"]
+  },
+  {
+    "id": "redis-pipeline",
+    "query": "galay-redis 的 pipeline 能解决什么问题？",
+    "search_expected_projects": ["galay-redis"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["Pipeline", "RTT", "批量"],
+    "chat_expected_projects": ["galay-redis"]
+  },
+  {
+    "id": "mysql-transaction",
+    "query": "galay-mysql 在事务和预处理方面有什么能力？",
+    "search_expected_projects": ["galay-mysql"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["预处理", "事务", "commit"],
+    "chat_expected_projects": ["galay-mysql"]
+  },
+  {
+    "id": "mongo-auth",
+    "query": "galay-mongo 支持什么认证方式和并发能力？",
+    "search_expected_projects": ["galay-mongo"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["SCRAM-SHA-256", "Pipeline", "异步"],
+    "chat_expected_projects": ["galay-mongo"]
+  },
+  {
+    "id": "etcd-features",
+    "query": "galay-etcd 提供哪些关键能力？",
+    "search_expected_projects": ["galay-etcd"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["KV", "Lease", "Txn"],
+    "chat_expected_projects": ["galay-etcd"]
+  },
+  {
+    "id": "utils-engineering",
+    "query": "galay-utils 里有哪些常见工程能力？",
+    "search_expected_projects": ["galay-utils"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["ThreadPool", "CircuitBreaker", "LoadBalancer"],
+    "chat_expected_projects": ["galay-utils"]
+  },
+  {
+    "id": "mcp-transport",
+    "query": "galay-mcp 支持哪些传输方式？",
+    "search_expected_projects": ["galay-mcp"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["stdio", "http", "schema"],
+    "chat_expected_projects": ["galay-mcp"]
+  },
+  {
+    "id": "ecosystem-layering",
+    "query": "Galay 生态分层有哪些？",
+    "search_expected_projects": ["galay-ecosystem"],
+    "search_expected_files": ["README.md"],
+    "chat_expected_keywords": ["Runtime", "Protocol", "Data"],
+    "chat_expected_projects": ["galay-ecosystem"]
+  }
+]

@@ -150,6 +150,41 @@ python scripts/run_server.py --reload
 make test
 ```
 
+### 6. 知识库自动重建与评测
+
+默认会同时索引 Markdown 与代码文件（`.h/.hpp/.cc/.cpp/...`），并跳过过大文件与二进制文件。
+
+```bash
+# 一键重建（可选先从 frontend/docs 生成 galay-* markdown）
+python scripts/rebuild_kb.py --force --generate-docs
+
+# 运行检索/问答基准评测
+python scripts/evaluate_kb.py --mode all
+```
+
+评测样例文件：
+
+```text
+service/ai/eval/benchmark_cases.json
+```
+
+### 7. 一键部署（Docker Compose）
+
+```bash
+cd service/ai
+bash scripts/builder.sh --docs-root /home/ubuntu/service/gblog/repos
+```
+
+常用参数：
+
+```bash
+# 重新构建镜像并部署 + 重建索引 + 评测
+bash scripts/builder.sh --docs-root /home/ubuntu/service/gblog/repos --run-eval
+
+# 仅重启服务，不重建索引
+bash scripts/builder.sh --no-build --no-rebuild-kb
+```
+
 ## 使用流程
 
 ```

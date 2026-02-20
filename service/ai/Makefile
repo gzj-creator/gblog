@@ -1,4 +1,4 @@
-.PHONY: install install-linux run build-index test docker-build docker-up docker-down clean
+.PHONY: install install-linux run build-index rebuild-kb eval-kb test docker-build docker-up docker-down clean
 
 install:
 	pip install -r requirements.txt
@@ -14,6 +14,12 @@ build-index:
 
 build-index-force:
 	python scripts/build_index.py --force
+
+rebuild-kb:
+	python scripts/rebuild_kb.py --force
+
+eval-kb:
+	python scripts/evaluate_kb.py --mode all
 
 test:
 	python scripts/test_api.py

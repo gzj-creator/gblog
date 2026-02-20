@@ -20,6 +20,13 @@ class Settings(BaseSettings):
     VECTOR_STORE_PATH: str = "./vector_store"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
+    CODE_CHUNK_SIZE: int = 1400
+    CODE_CHUNK_OVERLAP: int = 120
+
+    # Ingestion
+    ENABLE_CODE_INDEXING: bool = True
+    CODE_FILE_EXTENSIONS: str = ".h,.hpp,.hh,.hxx,.c,.cc,.cpp,.cxx,.ixx,.tpp"
+    MAX_INDEX_FILE_SIZE_KB: int = 512
 
     # Docs (recommended)
     GALAY_DOCS_ROOT_PATH: str = ""

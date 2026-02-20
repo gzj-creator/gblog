@@ -89,7 +89,12 @@ class VectorStoreManager:
         loader = GalayDocumentLoader()
         documents = loader.load_all()
         if not documents:
-            raise VectorStoreError("No documents loaded — cannot build vector store")
+            logger.warning("No documents loaded — creating empty vector store")
+            self._store = Chroma(
+                persist_directory=self._persist_dir,
+                embedding_function=self._embedding_mgr.get_embeddings(),
+            )
+            return
 
         logger.info(f"Creating vector store with {len(documents)} documents...")
         self._store = Chroma.from_documents(

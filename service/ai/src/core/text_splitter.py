@@ -27,3 +27,36 @@ class GalayTextSplitter:
         chunks = self._splitter.split_documents(documents)
         logger.debug(f"Split {len(documents)} documents into {len(chunks)} chunks")
         return chunks
+
+
+class GalayCodeSplitter:
+    """C/C++ 代码优化分割器"""
+
+    def __init__(
+        self,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
+    ):
+        self._splitter = RecursiveCharacterTextSplitter(
+            chunk_size=chunk_size or settings.CODE_CHUNK_SIZE,
+            chunk_overlap=chunk_overlap or settings.CODE_CHUNK_OVERLAP,
+            separators=[
+                "\nnamespace ",
+                "\nclass ",
+                "\nstruct ",
+                "\ntemplate<",
+                "\nCoroutine ",
+                "\nvoid ",
+                "\nbool ",
+                "\nint ",
+                "\n\n",
+                "\n",
+                " ",
+                "",
+            ],
+        )
+
+    def split(self, documents: List[Document]) -> List[Document]:
+        chunks = self._splitter.split_documents(documents)
+        logger.debug(f"Split {len(documents)} code files into {len(chunks)} chunks")
+        return chunks

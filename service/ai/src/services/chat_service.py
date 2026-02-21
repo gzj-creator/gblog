@@ -16,6 +16,8 @@ logger = get_logger(__name__)
 MAX_SESSIONS = 100
 MAX_HISTORY_ROUNDS = 20
 STREAM_BLOCK_SUFFIX = "\n\n"
+STREAM_EMIT_MIN_CHARS = 16
+STREAM_EMIT_MAX_CHARS = 120
 
 
 class ChatService:
@@ -69,27 +71,48 @@ class ChatService:
             sources = _extract_sources(docs)
             messages = self._build_messages(message, docs, session_id)
 
-            full_answer: List[str] = []
+            raw_answer_parts: List[str] = []
+            stream_buffer = ""
+            emitted_any = False
+
             async for chunk in self._llm.astream(messages):
                 text = _extract_message_text(chunk)
                 if text:
-                    full_answer.append(text)
+                    raw_answer_parts.append(text)
+                    stream_buffer += _sanitize_stream_fragment(text)
+                    while True:
+                        emit_piece, stream_buffer = _pop_stream_emit_piece(stream_buffer)
+                        if not emit_piece:
+                            break
+                        emitted_any = True
+                        yield {"content": emit_piece}
 
-            answer = "".join(full_answer)
-            if not answer.strip():
+            raw_answer = "".join(raw_answer_parts)
+            if not raw_answer.strip():
                 # 部分 OpenAI 兼容实现可能在 stream 中不给 content，兜底一次同步调用。
                 fallback = self._llm.invoke(messages)
-                answer = _extract_message_text(fallback).strip()
+                raw_answer = _extract_message_text(fallback).strip()
+                normalized_answer = _normalize_answer_text(raw_answer)
+                if not normalized_answer:
+                    normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
+                for block in _split_answer_blocks(normalized_answer):
+                    yield {"content": block}
+                answer = normalized_answer
+            else:
+                tail_piece = _finalize_stream_tail(stream_buffer)
+                if tail_piece:
+                    emitted_any = True
+                    yield {"content": tail_piece}
 
-            if not answer.strip():
-                answer = "抱歉，模型返回了空内容，请稍后重试。"
+                normalized_answer = _normalize_answer_text(raw_answer)
+                if not normalized_answer:
+                    normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
 
-            answer = _normalize_answer_text(answer)
-            if not answer.strip():
-                answer = "抱歉，模型返回了空内容，请稍后重试。"
-
-            for block in _split_answer_blocks(answer):
-                yield {"content": block}
+                # 防止清洗后无可显示内容时流为空，兜底补发标准分块文本。
+                if not emitted_any:
+                    for block in _split_answer_blocks(normalized_answer):
+                        yield {"content": block}
+                answer = normalized_answer
 
             self._append_history(session_id, message, answer)
 
@@ -314,3 +337,44 @@ def _split_answer_blocks(answer: str) -> List[str]:
         suffix = STREAM_BLOCK_SUFFIX if index + 1 < len(blocks) else ""
         chunks.append(f"{block}{suffix}")
     return chunks
+
+
+def _sanitize_stream_fragment(fragment: str) -> str:
+    if not fragment:
+        return ""
+
+    text = str(fragment).replace("\r\n", "\n").replace("\r", "\n")
+    text = _strip_decorative_symbols(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    return text
+
+
+def _pop_stream_emit_piece(buffer: str) -> tuple[str, str]:
+    if not buffer:
+        return "", ""
+
+    # 优先在句子边界输出，增强“逐步出现”的体感。
+    for idx, ch in enumerate(buffer):
+        if idx + 1 < STREAM_EMIT_MIN_CHARS:
+            continue
+        if ch in "\n。！？!?；;":
+            emit = buffer[: idx + 1].strip()
+            rest = buffer[idx + 1 :]
+            return emit, rest
+
+    # 太长则强制切一段，避免前端长时间无更新。
+    if len(buffer) >= STREAM_EMIT_MAX_CHARS:
+        cut = buffer.rfind(" ", 0, STREAM_EMIT_MAX_CHARS)
+        if cut <= 0:
+            cut = STREAM_EMIT_MAX_CHARS
+        emit = buffer[:cut].strip()
+        rest = buffer[cut:]
+        return emit, rest
+
+    return "", buffer
+
+
+def _finalize_stream_tail(buffer: str) -> str:
+    if not buffer:
+        return ""
+    return buffer.strip()

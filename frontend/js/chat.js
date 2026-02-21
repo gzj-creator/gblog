@@ -253,6 +253,10 @@ class ChatApp {
     _normalizeMarkdownInput(text) {
         let normalized = String(text || '').replace(/\r\n?/g, '\n');
         normalized = normalized.replace(/[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌🚀🎯✨💡]/gu, '');
+        // 修复行内 fence："...：```cpp" / "return 0;}```"。
+        normalized = normalized.replace(/([^\n])\s*[“”"']?\s*```([a-zA-Z0-9_-]*)/g, '$1\n```$2');
+        normalized = normalized.replace(/([^\n])```(?=\s*(?:\n|$))/g, '$1\n```');
+        normalized = normalized.replace(/([:：])\s*[“”"']\s*(?=\n```[a-zA-Z0-9_-]*\s*\n)/g, '$1');
 
         // 修复模型把分隔线和标题粘在一起的场景：---### ...
         normalized = normalized.replace(/([^\n])---(?=\s*#{1,6}\s)/g, '$1\n---\n');
@@ -307,6 +311,18 @@ class ChatApp {
             const trimmed = line.trim();
 
             if (isFenceLine(trimmed)) {
+                if (syntheticFence) {
+                    closeSyntheticFence();
+                    pendingLanguageHint = '';
+                    if (isFenceClose(trimmed)) {
+                        // synthetic 代码块后面的裸 ``` 视为同一个 closing，不再输出。
+                        continue;
+                    }
+                    output.push(trimmed);
+                    inFence = true;
+                    continue;
+                }
+
                 if (!inFence) {
                     closeSyntheticFence();
                     pendingLanguageHint = '';
@@ -432,6 +448,7 @@ class ChatApp {
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return true;
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$/.test(text)) return true;
         if (/\bco_(?:return|await|yield)\b/.test(text) && !hasChinese) return true;
+        if (/^\s*return\b[^一-龥]*[;}]\s*$/.test(text) && !hasChinese) return true;
         if (/->\s*\w+\(/.test(text) && !hasChinese) return true;
         if (/^[{}]+[;,]?$/.test(text)) return true;
         if (/^[)\]}]+[;,]?$/.test(text)) return true;

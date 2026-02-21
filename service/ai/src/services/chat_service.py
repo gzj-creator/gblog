@@ -399,6 +399,10 @@ def _strip_decorative_symbols(text: str) -> str:
 def _insert_structural_breaks(text: str) -> str:
     # 标题、编号、列表粘在同一行时，尽量拆成独立块。
     normalized = text
+    # 修复行内 fence："...：```cpp" / "return 0;}```"。
+    normalized = re.sub(r"([^\n])\s*[“”\"']?\s*```([A-Za-z0-9_-]*)", r"\1\n```\2", normalized)
+    normalized = re.sub(r"([^\n])```(?=\s*(?:\n|$))", r"\1\n```", normalized)
+    normalized = re.sub(r"([:：])\s*[“”\"']\s*(?=\n```[A-Za-z0-9_-]*\s*\n)", r"\1", normalized)
     normalized = re.sub(r"([^\n#])\s*(#{1,6}\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
     # 修复 "2.模块化..." 这种缺少空格的编号项。
@@ -449,6 +453,8 @@ def _looks_like_code_line(line: str) -> bool:
     if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$", stripped):
         return True
     if re.search(r"\bco_(return|await|yield)\b", stripped) and not has_cn:
+        return True
+    if re.search(r"^\s*return\b[^一-龥]*[;}]\s*$", stripped) and not has_cn:
         return True
     if re.search(r"->\s*\w+\(", stripped) and not has_cn:
         return True

@@ -260,45 +260,93 @@ def _normalize_answer_text(raw: str) -> str:
     text = str(raw).replace("\r\n", "\n").replace("\r", "\n")
     text = _strip_decorative_symbols(text)
     text = _insert_structural_breaks(text)
+    text = re.sub(r"(?i)\bcpp\s*(?=#include\b)", "", text)
     text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
     text = re.sub(r"[ \t]*\n[ \t]*", "\n", text).strip()
+    text = re.sub(r"\n{3,}", "\n\n", text)
     if not text:
         return ""
 
     blocks: List[str] = []
     paragraph_lines: List[str] = []
+    code_lines: List[str] = []
+    in_code_block = False
+    synthetic_code_block = False
 
     def flush_paragraph() -> None:
         if paragraph_lines:
             blocks.append(" ".join(paragraph_lines).strip())
             paragraph_lines.clear()
 
+    def flush_code() -> None:
+        if code_lines:
+            blocks.append("\n".join(code_lines).strip())
+            code_lines.clear()
+
     for raw_line in text.split("\n"):
-        line = raw_line.strip()
-        if not line:
-            flush_paragraph()
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if in_code_block:
+                code_lines.append(stripped)
+                flush_code()
+                in_code_block = False
+                synthetic_code_block = False
+            else:
+                flush_paragraph()
+                in_code_block = True
+                synthetic_code_block = False
+                code_lines = [stripped]
             continue
 
-        is_header = re.match(r"^#{1,6}\s+", line) is not None
-        if is_header:
-            line = re.sub(r"^#{1,6}\s+", "", line).strip()
-            if not line:
+        if in_code_block and not synthetic_code_block:
+            code_lines.append(line)
+            continue
+
+        if in_code_block and synthetic_code_block:
+            if not stripped or _looks_like_code_line(stripped):
+                if stripped:
+                    code_lines.append(_normalize_code_hint_line(stripped))
+                else:
+                    code_lines.append("")
                 continue
 
-        is_ol = re.match(r"^\d+\.\s+", line) is not None
-        is_ul = re.match(r"^[-*]\s+", line) is not None
+            code_lines.append("```")
+            flush_code()
+            in_code_block = False
+            synthetic_code_block = False
+
+        if not stripped:
+            flush_paragraph()
+            continue
+
+        if _looks_like_code_line(stripped):
+            flush_paragraph()
+            in_code_block = True
+            synthetic_code_block = True
+            code_lines = ["```cpp", _normalize_code_hint_line(stripped)]
+            continue
+
+        is_header = re.match(r"^#{1,6}\s+\S", stripped) is not None
+        is_ol = re.match(r"^\d+\.\s+\S", stripped) is not None
+        is_ul = re.match(r"^[-*]\s+\S", stripped) is not None
         if is_ol or is_ul:
             flush_paragraph()
-            blocks.append(line)
+            blocks.append(stripped)
             continue
 
         if is_header:
             flush_paragraph()
-            blocks.append(line)
+            blocks.append(stripped)
             continue
 
-        paragraph_lines.append(line)
+        paragraph_lines.append(stripped)
+
+    if in_code_block:
+        if not code_lines or code_lines[-1] != "```":
+            code_lines.append("```")
+        flush_code()
 
     flush_paragraph()
     blocks = [block for block in blocks if block]
@@ -324,7 +372,38 @@ def _insert_structural_breaks(text: str) -> str:
     normalized = re.sub(r"([。！？!?;；:：])\s*([-*]\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([一-龥A-Za-z0-9）)])-\s+", r"\1\n- ", normalized)
     normalized = re.sub(r"(^|\n)(#{1,6})\s*\n(?=\S)", r"\1\2 ", normalized)
+    normalized = re.sub(r"([:：])\s*(?:cpp|c\+\+)?\s*(#include\s*<)", r"\1\ncpp \2", normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"([:：。；;])\s*(int\s+main\s*\()", r"\1\n\2", normalized)
     return normalized
+
+
+def _looks_like_code_line(line: str) -> bool:
+    stripped = line.strip()
+    if not stripped:
+        return False
+
+    has_cn = re.search(r"[一-龥]", stripped) is not None
+
+    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", stripped, flags=re.IGNORECASE):
+        return True
+    if re.search(r"^\s*(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", stripped):
+        return True
+    if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$", stripped):
+        return True
+    if re.search(r"\bco_(return|await|yield)\b", stripped) and not has_cn:
+        return True
+    if re.search(r"->\s*\w+\(", stripped) and not has_cn:
+        return True
+    if stripped.endswith(";") and not has_cn and len(stripped) >= 12:
+        return True
+    if re.search(r"[{}]", stripped) and re.search(r"\(", stripped) and not has_cn:
+        return True
+
+    return False
+
+
+def _normalize_code_hint_line(line: str) -> str:
+    return re.sub(r"^(?:cpp|c\+\+)\s*(?=#include\b)", "", line, flags=re.IGNORECASE)
 
 
 def _split_answer_blocks(answer: str) -> List[str]:

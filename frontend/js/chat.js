@@ -21,6 +21,13 @@ class ChatApp {
                 this.sendMessage();
             }
         });
+        this.chatMessages.addEventListener('click', (e) => {
+            const copyBtn = e.target.closest('.code-copy-btn');
+            if (!copyBtn) return;
+            const codeElement = copyBtn.closest('.code-block')?.querySelector('code');
+            if (!codeElement) return;
+            this._copyCodeText(codeElement.textContent || '', copyBtn);
+        });
 
         this.quickButtons.forEach(btn => {
             btn.addEventListener('click', () => {
@@ -112,9 +119,15 @@ class ChatApp {
         const normalized = this._normalizeMarkdownInput(text);
         const withPlaceholders = normalized.replace(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (_match, lang, code) => {
             const codeIndex = codeBlocks.length;
-            const safeLang = lang ? ` class="language-${this.escapeHtml(lang)}"` : '';
+            const firstCodeLine = String(code || '').split('\n')[0] || '';
+            const guessedLang = this._guessCodeLanguage(firstCodeLine);
+            const normalizedLang = (lang || guessedLang || 'text').trim().toLowerCase();
+            const safeLang = normalizedLang ? ` class="language-${this.escapeHtml(normalizedLang)}"` : '';
             const safeCode = this.escapeHtml((code || '').replace(/\n$/, ''));
-            codeBlocks.push(`<pre><code${safeLang}>${safeCode}</code></pre>`);
+            const safeLabel = this.escapeHtml(normalizedLang || 'text');
+            codeBlocks.push(
+                `<div class="code-block"><div class="code-block-toolbar"><span class="code-lang">${safeLabel}</span><button type="button" class="code-copy-btn">复制</button></div><pre><code${safeLang}>${safeCode}</code></pre></div>`
+            );
             return `\n@@CODEBLOCK_${codeIndex}@@\n`;
         });
 
@@ -232,11 +245,12 @@ class ChatApp {
 
     _normalizeMarkdownInput(text) {
         let normalized = String(text || '').replace(/\r\n?/g, '\n');
+        normalized = normalized.replace(/[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌🚀🎯✨💡]/gu, '');
 
         // 修复模型把分隔线和标题粘在一起的场景：---### ...
         normalized = normalized.replace(/([^\n])---(?=\s*#{1,6}\s)/g, '$1\n---\n');
         normalized = normalized.replace(/---\s*(#{1,6}\s)/g, '---\n$1');
-        normalized = normalized.replace(/([^\n])\s*(#{1,6}\s)/g, '$1\n$2');
+        normalized = normalized.replace(/([^\n#])\s*(#{1,6}\s)/g, '$1\n$2');
 
         // 常见的“句号后紧跟 Markdown 结构”补换行。
         normalized = normalized.replace(/([。！？!?:：;；])\s*(#{1,6}\s)/g, '$1\n$2');
@@ -252,7 +266,147 @@ class ChatApp {
         // 修复 `###` 被错误断成单独一行的情况。
         normalized = normalized.replace(/(^|\n)(#{1,6})\s*\n(?=\S)/g, '$1$2 ');
 
+        // 识别被模型打平的代码段并补全 fenced code block。
+        normalized = this._recoverLooseCodeFences(normalized);
+
         return normalized;
+    }
+
+    _recoverLooseCodeFences(text) {
+        const lines = String(text || '').split('\n');
+        const output = [];
+        let inFence = false;
+        let syntheticFence = false;
+
+        const closeSyntheticFence = () => {
+            if (!syntheticFence) return;
+            output.push('```');
+            syntheticFence = false;
+        };
+
+        for (const rawLine of lines) {
+            const line = rawLine.replace(/\s+$/g, '');
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('```')) {
+                closeSyntheticFence();
+                output.push(trimmed);
+                inFence = !inFence;
+                continue;
+            }
+
+            if (inFence) {
+                output.push(rawLine);
+                continue;
+            }
+
+            if (!trimmed) {
+                closeSyntheticFence();
+                output.push('');
+                continue;
+            }
+
+            const inlineCodeIndex = this._detectInlineCodeStartIndex(trimmed);
+            if (inlineCodeIndex > 0) {
+                const plainText = trimmed.slice(0, inlineCodeIndex).trim();
+                const codeText = trimmed.slice(inlineCodeIndex).trim();
+                if (plainText) {
+                    closeSyntheticFence();
+                    output.push(plainText);
+                }
+                if (!syntheticFence) {
+                    output.push(`\`\`\`${this._guessCodeLanguage(codeText)}`);
+                    syntheticFence = true;
+                }
+                this._splitPackedCodeLine(codeText).forEach(part => output.push(part));
+                continue;
+            }
+
+            if (this._looksLikeCodeLine(trimmed)) {
+                if (!syntheticFence) {
+                    output.push(`\`\`\`${this._guessCodeLanguage(trimmed)}`);
+                    syntheticFence = true;
+                }
+                this._splitPackedCodeLine(trimmed).forEach(part => output.push(part));
+                continue;
+            }
+
+            closeSyntheticFence();
+            output.push(trimmed);
+        }
+
+        closeSyntheticFence();
+        return output.join('\n');
+    }
+
+    _detectInlineCodeStartIndex(text) {
+        if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return -1;
+        if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return -1;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return -1;
+        if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return -1;
+        if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]?\s*$/.test(text)) return -1;
+
+        const patterns = [
+            /(?:cpp|c\+\+)?\s*#include\s*</i,
+            /\bint\s+main\s*\(/,
+            /\bcmake_minimum_required\s*\(/i,
+            /\bproject\s*\(/i,
+            /\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i,
+        ];
+        let minIndex = -1;
+        for (const pattern of patterns) {
+            const match = pattern.exec(text);
+            if (!match) continue;
+            if (match.index <= 0) continue;
+            if (minIndex < 0 || match.index < minIndex) {
+                minIndex = match.index;
+            }
+        }
+        return minIndex;
+    }
+
+    _looksLikeCodeLine(line) {
+        const text = String(line || '').trim();
+        if (!text) return false;
+        const hasChinese = /[\u4e00-\u9fa5]/u.test(text);
+
+        if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return true;
+        if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return true;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return true;
+        if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return true;
+        if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$/.test(text)) return true;
+        if (/\bco_(?:return|await|yield)\b/.test(text) && !hasChinese) return true;
+        if (/->\s*\w+\(/.test(text) && !hasChinese) return true;
+        if (/[{}]/.test(text) && /\(/.test(text) && !hasChinese) return true;
+        if (/;$/.test(text) && text.length >= 12 && !hasChinese) return true;
+
+        return false;
+    }
+
+    _guessCodeLanguage(line) {
+        const text = String(line || '').trim();
+        if (!text) return 'text';
+        if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text) || /\bint\s+main\s*\(/.test(text)) return 'cpp';
+        if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return 'cmake';
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return 'bash';
+        return 'text';
+    }
+
+    _splitPackedCodeLine(line) {
+        const normalized = String(line || '')
+            .replace(
+                /(#include\s*<[^>]+>)\s*(?=(?:#include|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+))/gi,
+                '$1\n'
+            )
+            .replace(
+                /([;{}])\s*(?=(?:#include|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+|return\b))/g,
+                '$1\n'
+            );
+
+        return normalized
+            .split('\n')
+            .map(part => part.trim())
+            .filter(Boolean);
     }
 
     _formatInlineMarkdown(text) {
@@ -358,19 +512,21 @@ class ChatApp {
         while (true) {
             const { done, value } = await this._readChunkWithTimeout(reader, STREAM_IDLE_TIMEOUT_MS);
             if (done) {
-                const flushResult = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+                const flushResult = this._consumeSSEBuffer(buffer, fullText, contentDiv, (updatedText) => {
                     fullText = updatedText;
                     gotContent = gotContent || Boolean((fullText || '').trim());
                 });
+                fullText = flushResult.fullText;
                 streamComplete = streamComplete || flushResult.streamComplete;
                 break;
             }
 
             buffer += decoder.decode(value, { stream: true });
-            const parseResult = this._consumeSSEBuffer(buffer, contentDiv, (updatedText) => {
+            const parseResult = this._consumeSSEBuffer(buffer, fullText, contentDiv, (updatedText) => {
                 fullText = updatedText;
                 gotContent = gotContent || Boolean((fullText || '').trim());
             });
+            fullText = parseResult.fullText;
             buffer = parseResult.tail;
             streamComplete = streamComplete || parseResult.streamComplete;
             if (streamComplete) {
@@ -393,10 +549,10 @@ class ChatApp {
         }
     }
 
-    _consumeSSEBuffer(buffer, contentDiv, onTextUpdate) {
+    _consumeSSEBuffer(buffer, currentText, contentDiv, onTextUpdate) {
         const lines = buffer.split('\n');
         const tail = lines.pop() || '';
-        let fullText = contentDiv.textContent || '';
+        let fullText = currentText || '';
         let streamComplete = false;
 
         for (const rawLine of lines) {
@@ -429,7 +585,7 @@ class ChatApp {
                 // ignore malformed chunk
             }
         }
-        return { tail, streamComplete };
+        return { tail, streamComplete, fullText };
     }
 
     async _callNonStreamAPI(message) {
@@ -517,6 +673,43 @@ class ChatApp {
                     reject(error);
                 });
         });
+    }
+
+    async _copyCodeText(text, button) {
+        const copyText = String(text || '');
+        if (!copyText) return;
+
+        const previousText = button.textContent;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(copyText);
+            } else {
+                this._fallbackCopyText(copyText);
+            }
+            button.textContent = '已复制';
+            button.classList.add('copied');
+        } catch (_error) {
+            button.textContent = '复制失败';
+            button.classList.add('copy-failed');
+        } finally {
+            window.setTimeout(() => {
+                button.textContent = previousText || '复制';
+                button.classList.remove('copied', 'copy-failed');
+            }, 1200);
+        }
+    }
+
+    _fallbackCopyText(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', 'readonly');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        textarea.style.pointerEvents = 'none';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
     }
 }
 

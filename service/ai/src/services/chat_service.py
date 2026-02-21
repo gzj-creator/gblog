@@ -317,6 +317,15 @@ def _normalize_answer_text(raw: str) -> str:
             in_code_block = False
             synthetic_code_block = False
 
+        inline_code_start = _find_inline_code_start(stripped)
+        if inline_code_start > 0:
+            plain_text = stripped[:inline_code_start].strip()
+            candidate_code = stripped[inline_code_start:].strip()
+            if plain_text:
+                paragraph_lines.append(plain_text)
+                flush_paragraph()
+            stripped = candidate_code
+
         if not stripped:
             flush_paragraph()
             continue
@@ -325,7 +334,7 @@ def _normalize_answer_text(raw: str) -> str:
             flush_paragraph()
             in_code_block = True
             synthetic_code_block = True
-            code_lines = ["```cpp", _normalize_code_hint_line(stripped)]
+            code_lines = [f"```{_guess_code_language(stripped)}", _normalize_code_hint_line(stripped)]
             continue
 
         is_header = re.match(r"^#{1,6}\s+\S", stripped) is not None
@@ -366,14 +375,28 @@ def _strip_decorative_symbols(text: str) -> str:
 def _insert_structural_breaks(text: str) -> str:
     # 标题、编号、列表粘在同一行时，尽量拆成独立块。
     normalized = text
-    normalized = re.sub(r"([^\n])\s*(#{1,6}\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([^\n#])\s*(#{1,6}\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([^\n#])\s+(\d+\.\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*(\d+\.\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*([-*]\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([一-龥A-Za-z0-9）)])-\s+", r"\1\n- ", normalized)
     normalized = re.sub(r"(^|\n)(#{1,6})\s*\n(?=\S)", r"\1\2 ", normalized)
+    normalized = re.sub(r"([^\n])\s*((?:环境要求|安装步骤|最小示例|运行与验证)\s*[：:])", r"\1\n\2", normalized)
+    normalized = re.sub(r"(?m)^\s*(环境要求|安装步骤|最小示例|运行与验证)\s*[：:]\s*", r"## \1\n", normalized)
     normalized = re.sub(r"([:：])\s*(?:cpp|c\+\+)?\s*(#include\s*<)", r"\1\ncpp \2", normalized, flags=re.IGNORECASE)
     normalized = re.sub(r"([:：。；;])\s*(int\s+main\s*\()", r"\1\n\2", normalized)
+    normalized = re.sub(
+        r"([>;}])\s*(?=(?:#include|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+))",
+        r"\1\n",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    normalized = re.sub(
+        r"([:：。；;])\s*(\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b)",
+        r"\1\n\2",
+        normalized,
+        flags=re.IGNORECASE,
+    )
     return normalized
 
 
@@ -387,6 +410,10 @@ def _looks_like_code_line(line: str) -> bool:
     if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", stripped, flags=re.IGNORECASE):
         return True
     if re.search(r"^\s*(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", stripped):
+        return True
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", stripped, flags=re.IGNORECASE):
+        return True
+    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
         return True
     if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$", stripped):
         return True
@@ -403,7 +430,64 @@ def _looks_like_code_line(line: str) -> bool:
 
 
 def _normalize_code_hint_line(line: str) -> str:
-    return re.sub(r"^(?:cpp|c\+\+)\s*(?=#include\b)", "", line, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^(?:cpp|c\+\+)\s*(?=#include\b)", "", line, flags=re.IGNORECASE)
+    cleaned = re.sub(
+        r"^(?:bash|shell)\s*(?=\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b)",
+        "",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return cleaned
+
+
+def _find_inline_code_start(line: str) -> int:
+    if not line:
+        return -1
+
+    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", line, flags=re.IGNORECASE):
+        return -1
+    if re.search(r"^(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", line):
+        return -1
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", line, flags=re.IGNORECASE):
+        return -1
+    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", line, flags=re.IGNORECASE):
+        return -1
+    if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]?\s*$", line):
+        return -1
+
+    patterns = (
+        r"(?:cpp|c\+\+)?\s*#include\s*<",
+        r"\bint\s+main\s*\(",
+        r"\bcmake_minimum_required\s*\(",
+        r"\bproject\s*\(",
+        r"\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b",
+    )
+
+    starts: List[int] = []
+    for pattern in patterns:
+        match = re.search(pattern, line, flags=re.IGNORECASE)
+        if not match:
+            continue
+        if match.start() <= 0:
+            continue
+        starts.append(match.start())
+
+    return min(starts) if starts else -1
+
+
+def _guess_code_language(line: str) -> str:
+    stripped = (line or "").strip()
+    if not stripped:
+        return "text"
+
+    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", stripped, flags=re.IGNORECASE) or re.search(r"\bint\s+main\s*\(", stripped):
+        return "cpp"
+    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
+        return "cmake"
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", stripped, flags=re.IGNORECASE):
+        return "bash"
+
+    return "text"
 
 
 def _split_answer_blocks(answer: str) -> List[str]:

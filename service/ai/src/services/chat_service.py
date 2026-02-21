@@ -376,6 +376,13 @@ def _insert_structural_breaks(text: str) -> str:
     # 标题、编号、列表粘在同一行时，尽量拆成独立块。
     normalized = text
     normalized = re.sub(r"([^\n#])\s*(#{1,6}\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([。！？!?;；:：])\s*([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
+    # 修复 "2.模块化..." 这种缺少空格的编号项。
+    normalized = re.sub(r"(^|\n)([1-9]\d?)\.(?=[^\d\s])", r"\1\2. ", normalized)
+    # 修复编号项直接粘在中文文本后面: "...需求2.模块化..."
+    normalized = re.sub(r"([一-龥）)])([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
+    # 修复编号项粘连在前一句末尾: "...需求2. 模块化..."
+    normalized = re.sub(r"([^\n])([1-9]\d?\.\s+(?=[^\d]))", r"\1\n\2", normalized)
     normalized = re.sub(r"([^\n#])\s+(\d+\.\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*(\d+\.\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*([-*]\s)", r"\1\n\2", normalized)

@@ -123,7 +123,8 @@ class ChatApp {
             const guessedLang = this._guessCodeLanguage(firstCodeLine);
             const normalizedLang = (lang || guessedLang || 'text').trim().toLowerCase();
             const safeLang = normalizedLang ? ` class="language-${this.escapeHtml(normalizedLang)}"` : '';
-            const safeCode = this.escapeHtml((code || '').replace(/\n$/, ''));
+            const displayCode = this._normalizeCodeForDisplay((code || '').replace(/\n$/, ''), normalizedLang);
+            const safeCode = this._highlightCode(displayCode, normalizedLang);
             const safeLabel = this.escapeHtml(normalizedLang || 'text');
             codeBlocks.push(
                 `<div class="code-block"><div class="code-block-toolbar"><span class="code-lang">${safeLabel}</span><button type="button" class="code-copy-btn">复制</button></div><pre><code${safeLang}>${safeCode}</code></pre></div>`
@@ -256,6 +257,13 @@ class ChatApp {
         normalized = normalized.replace(/([。！？!?:：;；])\s*(#{1,6}\s)/g, '$1\n$2');
         normalized = normalized.replace(/([。！？!?:：;；])\s*([-*]\s)/g, '$1\n$2');
         normalized = normalized.replace(/([。！？!?:：;；])\s*(\d+\.\s)/g, '$1\n$2');
+        normalized = normalized.replace(/([。！？!?:：;；])\s*([1-9]\d?)\.(?=[^\d\s])/g, '$1\n$2. ');
+        // 修复 "2.模块化..." 这种缺少空格的编号项。
+        normalized = normalized.replace(/(^|\n)([1-9]\d?)\.(?=[^\d\s])/g, '$1$2. ');
+        // 修复编号项直接粘在中文文本后面: "...需求2.模块化..."
+        normalized = normalized.replace(/([一-龥）)])([1-9]\d?)\.(?=[^\d\s])/gu, '$1\n$2. ');
+        // 修复编号项粘连在前一句末尾: "...需求2. 模块化..."
+        normalized = normalized.replace(/([^\n])([1-9]\d?\.\s+(?=[^\d]))/g, '$1\n$2');
         normalized = normalized.replace(/([。！？!?:：;；])\s*([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
         normalized = normalized.replace(/([^#\n])\s+([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
 
@@ -407,6 +415,288 @@ class ChatApp {
             .split('\n')
             .map(part => part.trim())
             .filter(Boolean);
+    }
+
+    _normalizeCodeForDisplay(code, language) {
+        let text = String(code || '').replace(/\r\n?/g, '\n').trimEnd();
+        if (!text) return '';
+
+        const lang = String(language || '').toLowerCase();
+        const isCppLike = ['cpp', 'c++', 'cc', 'cxx', 'hpp', 'h'].includes(lang) || (lang === 'text' && this._looksLikeCodeLine(text.split('\n')[0] || ''));
+
+        if (isCppLike && this._needsCodeReflow(text)) {
+            text = this._splitCollapsedCppCode(text);
+            text = this._reindentBraceCode(text);
+        } else if (['bash', 'sh', 'zsh'].includes(lang) && this._needsCodeReflow(text)) {
+            text = text.replace(/;\s*(?=\S)/g, ';\n');
+        } else if (lang === 'cmake' && this._needsCodeReflow(text)) {
+            text = text.replace(/\)\s*(?=[A-Za-z_])/g, ')\n');
+        }
+
+        return text;
+    }
+
+    _needsCodeReflow(code) {
+        const text = String(code || '');
+        const lines = text.split('\n');
+        if (lines.length <= 1) return true;
+
+        const longLineCount = lines.filter(line => line.length > 120).length;
+        const mediumLineCount = lines.filter(line => line.length > 90).length;
+        const punctCount = (text.match(/[{};]/g) || []).length;
+
+        return longLineCount > 0 || (lines.length <= 6 && mediumLineCount >= 2) || (lines.length <= 4 && punctCount >= 8);
+    }
+
+    _splitCollapsedCppCode(code) {
+        let text = String(code || '');
+        text = text.replace(/(#\s*include\s*<[^>]+>)\s*(?=\S)/g, '$1\n');
+        text = text.replace(/>\s*(?=(?:#include\b|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+))/g, '>\n');
+        text = text.replace(/;\s*(?=})/g, ';\n');
+        text = text.replace(
+            /;\s*(?=(?:#include|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+|if\s*\(|for\s*\(|while\s*\(|switch\s*\(|return\b|auto\s+\w+|const\s+\w+|std::|[A-Za-z_]\w+\s*->))/g,
+            ';\n'
+        );
+        text = text.replace(/{\s*(?=\S)/g, '{\n');
+        text = text.replace(/}\s*(?=(?:else\b|[A-Za-z_#]))/g, '}\n');
+        text = text.replace(
+            /\)\s*(?=(?:if|for|while|switch|return|auto|const|std::|[A-Za-z_]\w+\s*->))/g,
+            ')\n'
+        );
+        text = text.replace(/\n{3,}/g, '\n\n');
+        return text;
+    }
+
+    _reindentBraceCode(code) {
+        const lines = String(code || '').split('\n');
+        const output = [];
+        let depth = 0;
+
+        for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line) {
+                output.push('');
+                continue;
+            }
+
+            const startsWithClose = line.startsWith('}');
+            const indentLevel = Math.max(depth - (startsWithClose ? 1 : 0), 0);
+            const indent = line.startsWith('#') ? '' : '    '.repeat(indentLevel);
+            output.push(`${indent}${line}`);
+
+            const openCount = (line.match(/{/g) || []).length;
+            const closeCount = (line.match(/}/g) || []).length;
+            depth += openCount - closeCount;
+            if (depth < 0) depth = 0;
+        }
+
+        return output.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    }
+
+    _highlightCode(code, language) {
+        const text = String(code || '');
+        const lang = String(language || '').toLowerCase();
+
+        if (['cpp', 'c++', 'cc', 'cxx', 'hpp', 'h'].includes(lang)) {
+            return this._highlightCpp(text);
+        }
+        if (['bash', 'sh', 'zsh'].includes(lang)) {
+            return this._highlightBash(text);
+        }
+        if (lang === 'cmake') {
+            return this._highlightCmake(text);
+        }
+        return this.escapeHtml(text);
+    }
+
+    _highlightCpp(code) {
+        const keywords = this._getCppKeywordSet();
+        const types = this._getCppTypeSet();
+        const nonFunctionWords = this._getCppNonFunctionWordSet();
+        let output = '';
+        let i = 0;
+        const text = String(code || '');
+
+        const isWordChar = (ch) => /[A-Za-z0-9_]/.test(ch);
+        const isDigit = (ch) => /[0-9]/.test(ch);
+
+        while (i < text.length) {
+            const ch = text[i];
+
+            if (ch === '/' && text[i + 1] === '/') {
+                let j = i + 2;
+                while (j < text.length && text[j] !== '\n') j += 1;
+                output += `<span class="code-token-comment">${this.escapeHtml(text.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            if (ch === '/' && text[i + 1] === '*') {
+                let j = i + 2;
+                while (j + 1 < text.length && !(text[j] === '*' && text[j + 1] === '/')) j += 1;
+                j = j + 1 < text.length ? j + 2 : text.length;
+                output += `<span class="code-token-comment">${this.escapeHtml(text.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            if (ch === '"' || ch === '\'') {
+                const quote = ch;
+                let j = i + 1;
+                while (j < text.length) {
+                    if (text[j] === '\\') {
+                        j += 2;
+                        continue;
+                    }
+                    if (text[j] === quote) {
+                        j += 1;
+                        break;
+                    }
+                    j += 1;
+                }
+                output += `<span class="code-token-string">${this.escapeHtml(text.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            if (i === 0 || text[i - 1] === '\n') {
+                let j = i;
+                while (j < text.length && (text[j] === ' ' || text[j] === '\t')) j += 1;
+                if (text[j] === '#') {
+                    let k = j;
+                    while (k < text.length && text[k] !== '\n') k += 1;
+                    output += this.escapeHtml(text.slice(i, j));
+                    output += `<span class="code-token-preproc">${this.escapeHtml(text.slice(j, k))}</span>`;
+                    i = k;
+                    continue;
+                }
+            }
+
+            if (/[A-Za-z_]/.test(ch)) {
+                let j = i + 1;
+                while (j < text.length && isWordChar(text[j])) j += 1;
+                const ident = text.slice(i, j);
+
+                if (keywords.has(ident)) {
+                    output += `<span class="code-token-keyword">${this.escapeHtml(ident)}</span>`;
+                } else if (types.has(ident) || ident.endsWith('_t')) {
+                    output += `<span class="code-token-type">${this.escapeHtml(ident)}</span>`;
+                } else {
+                    let k = j;
+                    while (k < text.length && (text[k] === ' ' || text[k] === '\t')) k += 1;
+                    const isFunction = text[k] === '(' && !nonFunctionWords.has(ident);
+                    if (isFunction) {
+                        output += `<span class="code-token-function">${this.escapeHtml(ident)}</span>`;
+                    } else {
+                        output += this.escapeHtml(ident);
+                    }
+                }
+                i = j;
+                continue;
+            }
+
+            if (isDigit(ch)) {
+                let j = i;
+                if (text[j] === '0' && (text[j + 1] === 'x' || text[j + 1] === 'X')) {
+                    j += 2;
+                    while (j < text.length && /[0-9A-Fa-f]/.test(text[j])) j += 1;
+                } else {
+                    while (j < text.length && /[0-9.]/.test(text[j])) j += 1;
+                    while (j < text.length && /[uUlLfF]/.test(text[j])) j += 1;
+                }
+                output += `<span class="code-token-number">${this.escapeHtml(text.slice(i, j))}</span>`;
+                i = j;
+                continue;
+            }
+
+            output += this.escapeHtml(ch);
+            i += 1;
+        }
+
+        return output;
+    }
+
+    _highlightBash(code) {
+        let html = this.escapeHtml(String(code || ''));
+        const placeholders = [];
+        const saveToken = (tokenHtml) => {
+            const index = placeholders.length;
+            placeholders.push(tokenHtml);
+            return `@@BASH_TOKEN_${index}@@`;
+        };
+
+        html = html.replace(/(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')/g, (match) => {
+            return saveToken(`<span class="code-token-string">${match}</span>`);
+        });
+
+        html = html.replace(/(^|\n)(\s*#.*)(?=\n|$)/g, (_m, prefix, comment) => {
+            return `${prefix}<span class="code-token-comment">${comment}</span>`;
+        });
+
+        html = html.replace(/\b(if|then|fi|for|in|do|done|while|case|esac|function|local|export|set|cd|echo|cat|grep|sed|awk|curl|wget|git|docker|kubectl|cmake|make|python|python3|pip|npm|pnpm|yarn)\b/g, '<span class="code-token-keyword">$1</span>');
+        html = html.replace(/(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}]+\})/g, '<span class="code-token-number">$1</span>');
+
+        html = html.replace(/@@BASH_TOKEN_(\d+)@@/g, (_m, idx) => placeholders[Number(idx)] || '');
+        return html;
+    }
+
+    _highlightCmake(code) {
+        let html = this.escapeHtml(String(code || ''));
+        const placeholders = [];
+        const saveToken = (tokenHtml) => {
+            const index = placeholders.length;
+            placeholders.push(tokenHtml);
+            return `@@CMAKE_TOKEN_${index}@@`;
+        };
+
+        html = html.replace(/(\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*')/g, (match) => {
+            return saveToken(`<span class="code-token-string">${match}</span>`);
+        });
+
+        html = html.replace(/(^|\n)(\s*#.*)(?=\n|$)/g, (_m, prefix, comment) => {
+            return `${prefix}<span class="code-token-comment">${comment}</span>`;
+        });
+
+        html = html.replace(/\b(project|cmake_minimum_required|add_executable|add_library|target_link_libraries|target_include_directories|set|if|elseif|else|endif|find_package|include|install)\b(?=\s*\()/g, '<span class="code-token-function">$1</span>');
+        html = html.replace(/(\$\{[^}]+\})/g, '<span class="code-token-number">$1</span>');
+
+        html = html.replace(/@@CMAKE_TOKEN_(\d+)@@/g, (_m, idx) => placeholders[Number(idx)] || '');
+        return html;
+    }
+
+    _getCppKeywordSet() {
+        if (!this._cppKeywordSet) {
+            this._cppKeywordSet = new Set([
+                'alignas', 'alignof', 'asm', 'auto', 'break', 'case', 'catch', 'class', 'concept', 'const',
+                'consteval', 'constexpr', 'constinit', 'continue', 'co_await', 'co_return', 'co_yield',
+                'decltype', 'default', 'delete', 'do', 'else', 'enum', 'explicit', 'export', 'extern', 'false',
+                'for', 'friend', 'goto', 'if', 'inline', 'mutable', 'namespace', 'new', 'noexcept', 'nullptr',
+                'operator', 'private', 'protected', 'public', 'requires', 'return', 'sizeof', 'static',
+                'static_assert', 'struct', 'switch', 'template', 'this', 'thread_local', 'throw', 'true', 'try',
+                'typedef', 'typename', 'union', 'using', 'virtual', 'volatile', 'while'
+            ]);
+        }
+        return this._cppKeywordSet;
+    }
+
+    _getCppTypeSet() {
+        if (!this._cppTypeSet) {
+            this._cppTypeSet = new Set([
+                'bool', 'char', 'char8_t', 'char16_t', 'char32_t', 'double', 'float', 'int', 'long', 'short',
+                'signed', 'size_t', 'ssize_t', 'std', 'string', 'string_view', 'uint8_t', 'uint16_t', 'uint32_t',
+                'uint64_t', 'int8_t', 'int16_t', 'int32_t', 'int64_t', 'void', 'wchar_t'
+            ]);
+        }
+        return this._cppTypeSet;
+    }
+
+    _getCppNonFunctionWordSet() {
+        if (!this._cppNonFunctionWordSet) {
+            this._cppNonFunctionWordSet = new Set([
+                'if', 'for', 'while', 'switch', 'catch', 'return', 'sizeof', 'alignof', 'decltype', 'new', 'delete'
+            ]);
+        }
+        return this._cppNonFunctionWordSet;
     }
 
     _formatInlineMarkdown(text) {

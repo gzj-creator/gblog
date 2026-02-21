@@ -354,6 +354,36 @@
     padding: var(--space-md);
 }
 
+.message-content .code-token-keyword {
+    color: var(--code-keyword);
+    font-weight: 600;
+}
+
+.message-content .code-token-type {
+    color: var(--code-type);
+}
+
+.message-content .code-token-function {
+    color: var(--code-function);
+}
+
+.message-content .code-token-string {
+    color: var(--code-string);
+}
+
+.message-content .code-token-number {
+    color: var(--code-number);
+}
+
+.message-content .code-token-comment {
+    color: var(--code-comment);
+    font-style: italic;
+}
+
+.message-content .code-token-preproc {
+    color: #ffb86c;
+}
+
 /* Sources */
 .sources-message {
     padding-left: 48px;

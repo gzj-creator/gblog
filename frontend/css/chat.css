@@ -179,14 +179,15 @@
 .message-content {
     padding: var(--space-md) var(--space-lg);
     border-radius: var(--radius-lg);
-    line-height: 1.7;
+    line-height: 1.75;
     font-size: 0.9rem;
 }
 
 .bot-message .message-content {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background: linear-gradient(160deg, rgba(15, 23, 42, 0.8) 0%, rgba(10, 17, 34, 0.92) 100%);
+    border: 1px solid rgba(122, 162, 247, 0.25);
     color: var(--text-primary);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
 }
 
 .user-message .message-content {
@@ -203,14 +204,65 @@
     margin-bottom: 0;
 }
 
-.message-content ul {
+.bot-message .message-content ul {
     margin: var(--space-sm) 0;
     padding-left: var(--space-lg);
 }
 
-.message-content li {
+.bot-message .message-content ol {
+    margin: var(--space-sm) 0;
+    padding-left: var(--space-lg);
+}
+
+.bot-message .message-content li {
     margin: var(--space-xs) 0;
     color: var(--text-secondary);
+}
+
+.bot-message .message-content li::marker {
+    color: var(--accent-primary);
+}
+
+.bot-message .message-content h1,
+.bot-message .message-content h2,
+.bot-message .message-content h3,
+.bot-message .message-content h4 {
+    margin: var(--space-sm) 0;
+    color: var(--text-primary);
+    line-height: 1.4;
+    font-weight: 600;
+}
+
+.bot-message .message-content h1 { font-size: 1.15rem; }
+.bot-message .message-content h2 { font-size: 1.08rem; }
+.bot-message .message-content h3 { font-size: 1rem; }
+.bot-message .message-content h4 { font-size: 0.95rem; }
+
+.bot-message .message-content h2,
+.bot-message .message-content h3 {
+    border-left: 3px solid var(--accent-primary);
+    padding-left: var(--space-sm);
+}
+
+.bot-message .message-content hr {
+    border: none;
+    border-top: 1px dashed var(--border-color);
+    margin: var(--space-sm) 0;
+}
+
+.bot-message .message-content blockquote {
+    margin: var(--space-sm) 0;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--accent-primary);
+    background: rgba(0, 255, 136, 0.08);
+    color: var(--text-secondary);
+    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.bot-message .message-content a {
+    color: var(--accent-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 .message-content code {

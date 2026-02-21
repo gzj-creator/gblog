@@ -108,24 +108,162 @@ class ChatApp {
     }
 
     formatMessage(text) {
-        // 先转义 HTML
-        text = this.escapeHtml(text);
+        const codeBlocks = [];
+        const normalized = this._normalizeMarkdownInput(text);
+        const withPlaceholders = normalized.replace(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (_match, lang, code) => {
+            const codeIndex = codeBlocks.length;
+            const safeLang = lang ? ` class="language-${this.escapeHtml(lang)}"` : '';
+            const safeCode = this.escapeHtml((code || '').replace(/\n$/, ''));
+            codeBlocks.push(`<pre><code${safeLang}>${safeCode}</code></pre>`);
+            return `\n@@CODEBLOCK_${codeIndex}@@\n`;
+        });
 
-        // 代码块
-        text = text.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+        const lines = withPlaceholders.split('\n');
+        const htmlParts = [];
+        let paragraphLines = [];
+        let blockquoteLines = [];
+        let activeList = '';
 
-        // 行内代码
-        text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+        const flushParagraph = () => {
+            if (paragraphLines.length === 0) return;
+            const html = paragraphLines.map(line => this._formatInlineMarkdown(line)).join('<br>');
+            htmlParts.push(`<p>${html}</p>`);
+            paragraphLines = [];
+        };
 
-        // 列表
-        text = text.replace(/^\* (.+)$/gm, '<li>$1</li>');
-        text = text.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+        const flushBlockquote = () => {
+            if (blockquoteLines.length === 0) return;
+            const html = blockquoteLines.map(line => this._formatInlineMarkdown(line)).join('<br>');
+            htmlParts.push(`<blockquote>${html}</blockquote>`);
+            blockquoteLines = [];
+        };
 
-        // 段落
-        text = text.replace(/\n\n/g, '</p><p>');
-        text = '<p>' + text + '</p>';
+        const closeList = () => {
+            if (!activeList) return;
+            htmlParts.push(`</${activeList}>`);
+            activeList = '';
+        };
 
-        return text;
+        for (const rawLine of lines) {
+            const line = rawLine.trimEnd();
+            const trimmed = line.trim();
+            if (!trimmed) {
+                flushParagraph();
+                flushBlockquote();
+                closeList();
+                continue;
+            }
+
+            const codeMatch = trimmed.match(/^@@CODEBLOCK_(\d+)@@$/);
+            if (codeMatch) {
+                flushParagraph();
+                flushBlockquote();
+                closeList();
+                const codeHtml = codeBlocks[Number(codeMatch[1])];
+                if (codeHtml) {
+                    htmlParts.push(codeHtml);
+                }
+                continue;
+            }
+
+            if (/^([-*_])\1{2,}$/.test(trimmed)) {
+                flushParagraph();
+                flushBlockquote();
+                closeList();
+                htmlParts.push('<hr>');
+                continue;
+            }
+
+            const headingMatch = trimmed.match(/^(#{1,6})\s+(.+)$/);
+            if (headingMatch) {
+                flushParagraph();
+                flushBlockquote();
+                closeList();
+                const level = headingMatch[1].length;
+                htmlParts.push(`<h${level}>${this._formatInlineMarkdown(headingMatch[2])}</h${level}>`);
+                continue;
+            }
+
+            const quoteMatch = trimmed.match(/^>\s?(.*)$/);
+            if (quoteMatch) {
+                flushParagraph();
+                closeList();
+                blockquoteLines.push(quoteMatch[1]);
+                continue;
+            }
+
+            const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+            if (olMatch) {
+                flushParagraph();
+                flushBlockquote();
+                if (activeList !== 'ol') {
+                    closeList();
+                    htmlParts.push('<ol>');
+                    activeList = 'ol';
+                }
+                htmlParts.push(`<li>${this._formatInlineMarkdown(olMatch[1])}</li>`);
+                continue;
+            }
+
+            const ulMatch = trimmed.match(/^[-*]\s+(.+)$/);
+            if (ulMatch) {
+                flushParagraph();
+                flushBlockquote();
+                if (activeList !== 'ul') {
+                    closeList();
+                    htmlParts.push('<ul>');
+                    activeList = 'ul';
+                }
+                htmlParts.push(`<li>${this._formatInlineMarkdown(ulMatch[1])}</li>`);
+                continue;
+            }
+
+            flushBlockquote();
+            closeList();
+            paragraphLines.push(trimmed);
+        }
+
+        flushParagraph();
+        flushBlockquote();
+        closeList();
+
+        return htmlParts.join('');
+    }
+
+    _normalizeMarkdownInput(text) {
+        let normalized = String(text || '').replace(/\r\n?/g, '\n');
+
+        // 修复模型把分隔线和标题粘在一起的场景：---### ...
+        normalized = normalized.replace(/([^\n])---(?=\s*#{1,6}\s)/g, '$1\n---\n');
+        normalized = normalized.replace(/---\s*(#{1,6}\s)/g, '---\n$1');
+
+        // 常见的“句号后紧跟 Markdown 结构”补换行。
+        normalized = normalized.replace(/([。！？!?:：;；])\s*(#{1,6}\s)/g, '$1\n$2');
+        normalized = normalized.replace(/([。！？!?:：;；])\s*([-*]\s)/g, '$1\n$2');
+        normalized = normalized.replace(/([。！？!?:：;；])\s*(\d+\.\s)/g, '$1\n$2');
+
+        return normalized;
+    }
+
+    _formatInlineMarkdown(text) {
+        const escaped = this.escapeHtml(String(text || ''));
+        const inlineCodes = [];
+        let html = escaped.replace(/`([^`\n]+)`/g, (_match, code) => {
+            const codeIndex = inlineCodes.length;
+            inlineCodes.push(`<code>${code}</code>`);
+            return `@@INLINE_CODE_${codeIndex}@@`;
+        });
+
+        html = html
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+            .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        html = html.replace(/@@INLINE_CODE_(\d+)@@/g, (_match, index) => {
+            return inlineCodes[Number(index)] || '';
+        });
+
+        return html;
     }
 
     showTypingIndicator() {

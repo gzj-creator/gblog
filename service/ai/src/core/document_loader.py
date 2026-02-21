@@ -4,6 +4,7 @@ from typing import List, Optional, Set
 from langchain_core.documents import Document
 
 from src.config import settings
+from src.core.document_cleaner import clean_document_content
 from src.core.text_splitter import GalayCodeSplitter, GalayTextSplitter
 from src.utils.exceptions import DocumentLoadError
 from src.utils.logger import get_logger
@@ -30,6 +31,10 @@ class GalayDocumentLoader:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
         except Exception as e:
             raise DocumentLoadError(f"Failed to read {path}: {e}")
+        cleaned_content = clean_document_content(content, file_type)
+        if not cleaned_content:
+            logger.debug(f"Skip empty content after cleaning: {path}")
+            return []
 
         project = self._extract_project(path, base_path)
         metadata = {
@@ -37,12 +42,16 @@ class GalayDocumentLoader:
             "project": project,
             "file_name": file_path.name,
             "file_type": file_type,
+            "cleaned": True,
         }
 
-        doc = Document(page_content=content, metadata=metadata)
+        doc = Document(page_content=cleaned_content, metadata=metadata)
         splitter = self._markdown_splitter if file_type == "markdown" else self._code_splitter
         chunks = splitter.split([doc])
-        logger.info(f"Loaded {len(chunks)} chunks from {metadata['source']}")
+        logger.info(
+            f"Loaded {len(chunks)} chunks from {metadata['source']} "
+            f"(cleaned {len(content)} -> {len(cleaned_content)})"
+        )
         return chunks
 
     def load_all(self) -> List[Document]:

@@ -131,6 +131,9 @@ make build-index
 make build-index-force
 ```
 
+索引构建前会自动做文档清洗（去除常见装饰符号并修复粘连段落/列表），
+如果你调整了清洗逻辑，需要执行 `make build-index-force` 让存量索引生效。
+
 ### 4. 启动服务
 
 ```bash

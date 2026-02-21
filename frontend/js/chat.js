@@ -192,7 +192,7 @@ class ChatApp {
                 continue;
             }
 
-            const olMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+            const olMatch = trimmed.match(/^[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]?\s*\d+\.\s+(.+)$/u);
             if (olMatch) {
                 flushParagraph();
                 flushBlockquote();
@@ -236,11 +236,21 @@ class ChatApp {
         // 修复模型把分隔线和标题粘在一起的场景：---### ...
         normalized = normalized.replace(/([^\n])---(?=\s*#{1,6}\s)/g, '$1\n---\n');
         normalized = normalized.replace(/---\s*(#{1,6}\s)/g, '---\n$1');
+        normalized = normalized.replace(/([^\n])\s*(#{1,6}\s)/g, '$1\n$2');
 
         // 常见的“句号后紧跟 Markdown 结构”补换行。
         normalized = normalized.replace(/([。！？!?:：;；])\s*(#{1,6}\s)/g, '$1\n$2');
         normalized = normalized.replace(/([。！？!?:：;；])\s*([-*]\s)/g, '$1\n$2');
         normalized = normalized.replace(/([。！？!?:：;；])\s*(\d+\.\s)/g, '$1\n$2');
+        normalized = normalized.replace(/([。！？!?:：;；])\s*([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
+        normalized = normalized.replace(/([^#\n])\s+([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
+
+        // 把行内“列表分隔符”尽量拆成独立列表行。
+        normalized = normalized.replace(/([。；;:：）)])\s*-\s+/g, '$1\n- ');
+        normalized = normalized.replace(/([一-龥])-\s+/gu, '$1\n- ');
+
+        // 修复 `###` 被错误断成单独一行的情况。
+        normalized = normalized.replace(/(^|\n)(#{1,6})\s*\n(?=\S)/g, '$1$2 ');
 
         return normalized;
     }

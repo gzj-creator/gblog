@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import re
 from typing import Any, AsyncGenerator, Dict, List
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -14,6 +15,7 @@ logger = get_logger(__name__)
 
 MAX_SESSIONS = 100
 MAX_HISTORY_ROUNDS = 20
+STREAM_BLOCK_SUFFIX = "\n\n"
 
 
 class ChatService:
@@ -42,7 +44,7 @@ class ChatService:
             messages = self._build_messages(message, docs, session_id)
 
             response = self._llm.invoke(messages)
-            answer = _extract_message_text(response)
+            answer = _normalize_answer_text(_extract_message_text(response))
             if not answer.strip():
                 answer = "抱歉，模型返回了空内容，请稍后重试。"
 
@@ -67,24 +69,27 @@ class ChatService:
             sources = _extract_sources(docs)
             messages = self._build_messages(message, docs, session_id)
 
-            full_answer = []
+            full_answer: List[str] = []
             async for chunk in self._llm.astream(messages):
                 text = _extract_message_text(chunk)
                 if text:
                     full_answer.append(text)
-                    yield {"content": text}
 
             answer = "".join(full_answer)
             if not answer.strip():
                 # 部分 OpenAI 兼容实现可能在 stream 中不给 content，兜底一次同步调用。
                 fallback = self._llm.invoke(messages)
                 answer = _extract_message_text(fallback).strip()
-                if answer:
-                    yield {"content": answer}
 
             if not answer.strip():
                 answer = "抱歉，模型返回了空内容，请稍后重试。"
-                yield {"content": answer}
+
+            answer = _normalize_answer_text(answer)
+            if not answer.strip():
+                answer = "抱歉，模型返回了空内容，请稍后重试。"
+
+            for block in _split_answer_blocks(answer):
+                yield {"content": block}
 
             self._append_history(session_id, message, answer)
 
@@ -103,7 +108,7 @@ class ChatService:
                     "response": "抱歉，我在文档中没有找到相关信息。请尝试换个方式提问。",
                     "sources": [],
                 }
-            answer = self._rag.generate(message, docs)
+            answer = _normalize_answer_text(self._rag.generate(message, docs))
             sources = _extract_sources(docs)
             return {"success": True, "response": answer, "sources": sources}
         except Exception as e:
@@ -222,3 +227,90 @@ def _coerce_text(value: Any) -> str:
         return ""
 
     return str(value)
+
+
+def _normalize_answer_text(raw: str) -> str:
+    """清洗模型输出中的装饰符号，并重排为结构化分块文本。"""
+    if not raw:
+        return ""
+
+    text = str(raw).replace("\r\n", "\n").replace("\r", "\n")
+    text = _strip_decorative_symbols(text)
+    text = _insert_structural_breaks(text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text).strip()
+    if not text:
+        return ""
+
+    blocks: List[str] = []
+    paragraph_lines: List[str] = []
+
+    def flush_paragraph() -> None:
+        if paragraph_lines:
+            blocks.append(" ".join(paragraph_lines).strip())
+            paragraph_lines.clear()
+
+    for raw_line in text.split("\n"):
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            continue
+
+        is_header = re.match(r"^#{1,6}\s+", line) is not None
+        if is_header:
+            line = re.sub(r"^#{1,6}\s+", "", line).strip()
+            if not line:
+                continue
+
+        is_ol = re.match(r"^\d+\.\s+", line) is not None
+        is_ul = re.match(r"^[-*]\s+", line) is not None
+        if is_ol or is_ul:
+            flush_paragraph()
+            blocks.append(line)
+            continue
+
+        if is_header:
+            flush_paragraph()
+            blocks.append(line)
+            continue
+
+        paragraph_lines.append(line)
+
+    flush_paragraph()
+    blocks = [block for block in blocks if block]
+    return "\n\n".join(blocks).strip()
+
+
+def _strip_decorative_symbols(text: str) -> str:
+    # 去掉常见装饰 emoji / 图标符号，保留中文标点与 Markdown 基础结构。
+    decorative = (
+        "[✅☑✔✳✴★☆⭐🔥🌟✨💡🔧⚙🛠📈📌📍🚀🎯▶►■□▪▫◆◇•·]"
+    )
+    stripped = re.sub(decorative, "", text)
+    stripped = re.sub(r"\s*---+\s*", "\n", stripped)
+    return stripped
+
+
+def _insert_structural_breaks(text: str) -> str:
+    # 标题、编号、列表粘在同一行时，尽量拆成独立块。
+    normalized = text
+    normalized = re.sub(r"([^\n])\s*(#{1,6}\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([^\n#])\s+(\d+\.\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([。！？!?;；:：])\s*(\d+\.\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([。！？!?;；:：])\s*([-*]\s)", r"\1\n\2", normalized)
+    normalized = re.sub(r"([一-龥A-Za-z0-9）)])-\s+", r"\1\n- ", normalized)
+    normalized = re.sub(r"(^|\n)(#{1,6})\s*\n(?=\S)", r"\1\2 ", normalized)
+    return normalized
+
+
+def _split_answer_blocks(answer: str) -> List[str]:
+    blocks = [block.strip() for block in answer.split("\n\n") if block.strip()]
+    if not blocks:
+        return []
+
+    chunks: List[str] = []
+    for index, block in enumerate(blocks):
+        suffix = STREAM_BLOCK_SUFFIX if index + 1 < len(blocks) else ""
+        chunks.append(f"{block}{suffix}")
+    return chunks

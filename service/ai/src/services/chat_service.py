@@ -272,6 +272,7 @@ def _normalize_answer_text(raw: str) -> str:
     code_lines: List[str] = []
     in_code_block = False
     synthetic_code_block = False
+    pending_language_hint = ""
 
     def flush_paragraph() -> None:
         if paragraph_lines:
@@ -289,15 +290,25 @@ def _normalize_answer_text(raw: str) -> str:
 
         if stripped.startswith("```"):
             if in_code_block:
-                code_lines.append(stripped)
-                flush_code()
-                in_code_block = False
-                synthetic_code_block = False
+                if re.match(r"^```\s*$", stripped):
+                    code_lines.append("```")
+                    flush_code()
+                    in_code_block = False
+                    synthetic_code_block = False
+                else:
+                    # fence 内出现 ```cpp 这类脏行时，不提前结束 code block。
+                    nested_hint = re.sub(r"^```", "", stripped).strip()
+                    if nested_hint:
+                        code_lines.append(nested_hint)
             else:
                 flush_paragraph()
                 in_code_block = True
                 synthetic_code_block = False
-                code_lines = [stripped]
+                pending_language_hint = ""
+                if re.match(r"^```[A-Za-z0-9_-]+\s*$", stripped):
+                    code_lines = [stripped]
+                else:
+                    code_lines = ["```"]
             continue
 
         if in_code_block and not synthetic_code_block:
@@ -317,6 +328,10 @@ def _normalize_answer_text(raw: str) -> str:
             in_code_block = False
             synthetic_code_block = False
 
+        if _is_language_hint(stripped):
+            pending_language_hint = _normalize_language_hint(stripped)
+            continue
+
         inline_code_start = _find_inline_code_start(stripped)
         if inline_code_start > 0:
             plain_text = stripped[:inline_code_start].strip()
@@ -328,13 +343,16 @@ def _normalize_answer_text(raw: str) -> str:
 
         if not stripped:
             flush_paragraph()
+            pending_language_hint = ""
             continue
 
         if _looks_like_code_line(stripped):
             flush_paragraph()
             in_code_block = True
             synthetic_code_block = True
-            code_lines = [f"```{_guess_code_language(stripped)}", _normalize_code_hint_line(stripped)]
+            code_lang = pending_language_hint or _guess_code_language(stripped)
+            pending_language_hint = ""
+            code_lines = [f"```{code_lang}", _normalize_code_hint_line(stripped)]
             continue
 
         is_header = re.match(r"^#{1,6}\s+\S", stripped) is not None
@@ -348,8 +366,10 @@ def _normalize_answer_text(raw: str) -> str:
         if is_header:
             flush_paragraph()
             blocks.append(stripped)
+            pending_language_hint = ""
             continue
 
+        pending_language_hint = ""
         paragraph_lines.append(stripped)
 
     if in_code_block:
@@ -359,6 +379,10 @@ def _normalize_answer_text(raw: str) -> str:
 
     flush_paragraph()
     blocks = [block for block in blocks if block]
+    blocks = [
+        block for block in blocks
+        if not re.match(r"^```[A-Za-z0-9_-]*\n\s*```$", block.strip(), flags=re.DOTALL)
+    ]
     return "\n\n".join(blocks).strip()
 
 
@@ -428,12 +452,38 @@ def _looks_like_code_line(line: str) -> bool:
         return True
     if re.search(r"->\s*\w+\(", stripped) and not has_cn:
         return True
+    if re.search(r"^[{}]+[;,]?$", stripped):
+        return True
+    if re.search(r"^[)\]}]+[;,]?$", stripped):
+        return True
     if stripped.endswith(";") and not has_cn and len(stripped) >= 12:
         return True
     if re.search(r"[{}]", stripped) and re.search(r"\(", stripped) and not has_cn:
         return True
 
     return False
+
+
+def _is_language_hint(line: str) -> bool:
+    return bool(_normalize_language_hint(line))
+
+
+def _normalize_language_hint(line: str) -> str:
+    stripped = (line or "").strip().lower()
+    stripped = re.sub(r"^\s*[-*+]\s*", "", stripped)
+    stripped = re.sub(r"^`+|`+$", "", stripped)
+    stripped = re.sub(r"[：:]\s*$", "", stripped)
+    stripped = re.sub(r"^language\s*[：:]\s*", "", stripped)
+    stripped = stripped.strip()
+    if stripped in {"cpp", "c++", "cc", "cxx", "hpp", "h"}:
+        return "cpp"
+    if stripped in {"bash", "shell", "sh", "zsh"}:
+        return "bash"
+    if stripped == "cmake":
+        return "cmake"
+    if stripped in {"text", "plaintext"}:
+        return "text"
+    return ""
 
 
 def _normalize_code_hint_line(line: str) -> str:

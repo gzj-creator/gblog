@@ -117,19 +117,25 @@ class ChatApp {
     formatMessage(text) {
         const codeBlocks = [];
         const normalized = this._normalizeMarkdownInput(text);
-        const withPlaceholders = normalized.replace(/```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g, (_match, lang, code) => {
+        const withPlaceholders = normalized.replace(/(^|\n)```([a-zA-Z0-9_-]+)?[ \t]*\n([\s\S]*?)\n```[ \t]*(?=\n|$)/g, (_match, prefix, lang, code) => {
             const codeIndex = codeBlocks.length;
             const firstCodeLine = String(code || '').split('\n')[0] || '';
             const guessedLang = this._guessCodeLanguage(firstCodeLine);
             const normalizedLang = (lang || guessedLang || 'text').trim().toLowerCase();
             const safeLang = normalizedLang ? ` class="language-${this.escapeHtml(normalizedLang)}"` : '';
             const displayCode = this._normalizeCodeForDisplay((code || '').replace(/\n$/, ''), normalizedLang);
+            if (!displayCode.trim()) {
+                return `${prefix}\n`;
+            }
+            if (!this._isLikelyCodeContent(displayCode, normalizedLang)) {
+                return `${prefix}\n${displayCode}\n`;
+            }
             const safeCode = this._highlightCode(displayCode, normalizedLang);
             const safeLabel = this.escapeHtml(normalizedLang || 'text');
             codeBlocks.push(
                 `<div class="code-block"><div class="code-block-toolbar"><span class="code-lang">${safeLabel}</span><button type="button" class="code-copy-btn">复制</button></div><pre><code${safeLang}>${safeCode}</code></pre></div>`
             );
-            return `\n@@CODEBLOCK_${codeIndex}@@\n`;
+            return `${prefix}\n@@CODEBLOCK_${codeIndex}@@\n`;
         });
 
         const lines = withPlaceholders.split('\n');
@@ -285,6 +291,7 @@ class ChatApp {
         const output = [];
         let inFence = false;
         let syntheticFence = false;
+        let pendingLanguageHint = '';
 
         const closeSyntheticFence = () => {
             if (!syntheticFence) return;
@@ -292,14 +299,34 @@ class ChatApp {
             syntheticFence = false;
         };
 
+        const isFenceLine = (line) => /^```[a-zA-Z0-9_-]*\s*$/.test(line);
+        const isFenceClose = (line) => /^```\s*$/.test(line);
+
         for (const rawLine of lines) {
             const line = rawLine.replace(/\s+$/g, '');
             const trimmed = line.trim();
 
-            if (trimmed.startsWith('```')) {
-                closeSyntheticFence();
-                output.push(trimmed);
-                inFence = !inFence;
+            if (isFenceLine(trimmed)) {
+                if (!inFence) {
+                    closeSyntheticFence();
+                    pendingLanguageHint = '';
+                    output.push(trimmed);
+                    inFence = true;
+                    continue;
+                }
+
+                if (isFenceClose(trimmed)) {
+                    output.push('```');
+                    inFence = false;
+                    pendingLanguageHint = '';
+                    continue;
+                }
+
+                // fence 内再次出现 ```cpp 这类脏行，按语言标记文本处理，避免提前闭合。
+                const nestedHint = trimmed.replace(/^```/, '').trim();
+                if (nestedHint) {
+                    output.push(nestedHint);
+                }
                 continue;
             }
 
@@ -310,7 +337,13 @@ class ChatApp {
 
             if (!trimmed) {
                 closeSyntheticFence();
+                pendingLanguageHint = '';
                 output.push('');
+                continue;
+            }
+
+            if (this._isStandaloneLanguageHint(trimmed) && !syntheticFence) {
+                pendingLanguageHint = this._normalizeLanguageHint(trimmed);
                 continue;
             }
 
@@ -320,30 +353,45 @@ class ChatApp {
                 const codeText = trimmed.slice(inlineCodeIndex).trim();
                 if (plainText) {
                     closeSyntheticFence();
+                    if (pendingLanguageHint) {
+                        output.push(pendingLanguageHint);
+                        pendingLanguageHint = '';
+                    }
                     output.push(plainText);
                 }
                 if (!syntheticFence) {
-                    output.push(`\`\`\`${this._guessCodeLanguage(codeText)}`);
+                    const lang = pendingLanguageHint || this._guessCodeLanguage(codeText);
+                    output.push(`\`\`\`${lang}`);
                     syntheticFence = true;
                 }
+                pendingLanguageHint = '';
                 this._splitPackedCodeLine(codeText).forEach(part => output.push(part));
                 continue;
             }
 
             if (this._looksLikeCodeLine(trimmed)) {
                 if (!syntheticFence) {
-                    output.push(`\`\`\`${this._guessCodeLanguage(trimmed)}`);
+                    const lang = pendingLanguageHint || this._guessCodeLanguage(trimmed);
+                    output.push(`\`\`\`${lang}`);
                     syntheticFence = true;
                 }
+                pendingLanguageHint = '';
                 this._splitPackedCodeLine(trimmed).forEach(part => output.push(part));
                 continue;
             }
 
             closeSyntheticFence();
+            if (pendingLanguageHint) {
+                output.push(pendingLanguageHint);
+                pendingLanguageHint = '';
+            }
             output.push(trimmed);
         }
 
         closeSyntheticFence();
+        if (pendingLanguageHint) {
+            output.push(pendingLanguageHint);
+        }
         return output.join('\n');
     }
 
@@ -385,6 +433,8 @@ class ChatApp {
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$/.test(text)) return true;
         if (/\bco_(?:return|await|yield)\b/.test(text) && !hasChinese) return true;
         if (/->\s*\w+\(/.test(text) && !hasChinese) return true;
+        if (/^[{}]+[;,]?$/.test(text)) return true;
+        if (/^[)\]}]+[;,]?$/.test(text)) return true;
         if (/[{}]/.test(text) && /\(/.test(text) && !hasChinese) return true;
         if (/;$/.test(text) && text.length >= 12 && !hasChinese) return true;
 
@@ -398,6 +448,27 @@ class ChatApp {
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return 'cmake';
         if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return 'bash';
         return 'text';
+    }
+
+    _isStandaloneLanguageHint(line) {
+        const lang = this._normalizeLanguageHint(line);
+        return lang !== '';
+    }
+
+    _normalizeLanguageHint(line) {
+        let text = String(line || '').trim().toLowerCase();
+        text = text
+            .replace(/^\s*[-*+]\s*/, '')
+            .replace(/^`+|`+$/g, '')
+            .replace(/[：:]\s*$/g, '')
+            .replace(/^language\s*[：:]\s*/g, '')
+            .trim();
+
+        if (['cpp', 'c++', 'cc', 'cxx', 'hpp', 'h'].includes(text)) return 'cpp';
+        if (['bash', 'shell', 'sh', 'zsh'].includes(text)) return 'bash';
+        if (text === 'cmake') return 'cmake';
+        if (text === 'text' || text === 'plaintext') return 'text';
+        return '';
     }
 
     _splitPackedCodeLine(line) {
@@ -418,7 +489,7 @@ class ChatApp {
     }
 
     _normalizeCodeForDisplay(code, language) {
-        let text = String(code || '').replace(/\r\n?/g, '\n').trimEnd();
+        let text = this._sanitizeCodeFenceContent(String(code || '').replace(/\r\n?/g, '\n'), language).trimEnd();
         if (!text) return '';
 
         const lang = String(language || '').toLowerCase();
@@ -434,6 +505,83 @@ class ChatApp {
         }
 
         return text;
+    }
+
+    _sanitizeCodeFenceContent(code, language) {
+        const lines = String(code || '').split('\n');
+        const lang = this._normalizeLanguageHint(language) || String(language || '').toLowerCase() || 'text';
+        const isFence = (line) => /^```[a-zA-Z0-9_-]*\s*$/.test(line.trim());
+
+        while (lines.length > 0) {
+            const first = lines[0].trim();
+            if (!first) {
+                lines.shift();
+                continue;
+            }
+            if (isFence(first)) {
+                lines.shift();
+                continue;
+            }
+            const hint = this._normalizeLanguageHint(first);
+            if (hint && (hint === lang || lang === 'text')) {
+                lines.shift();
+                continue;
+            }
+            break;
+        }
+
+        while (lines.length > 0) {
+            const last = lines[lines.length - 1].trim();
+            if (!last) {
+                lines.pop();
+                continue;
+            }
+            if (isFence(last)) {
+                lines.pop();
+                continue;
+            }
+            break;
+        }
+
+        return lines.join('\n');
+    }
+
+    _isLikelyCodeContent(code, language) {
+        const text = String(code || '').trim();
+        if (!text) return false;
+        const lang = String(language || '').toLowerCase();
+
+        if (['bash', 'sh', 'zsh'].includes(lang)) {
+            const lines = text.split('\n');
+            const hasCommandLikeLine = lines.some((line) => {
+                const match = line.match(/^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make)\b([^\n]*)$/i);
+                if (!match) return false;
+                const tail = String(match[2] || '');
+                if (!tail.trim()) return true;
+                return /^\s+[$A-Za-z0-9_./:@=-]/.test(tail);
+            });
+
+            return hasCommandLikeLine
+                || /[;&|]/.test(text)
+                || /^\s*\.\//m.test(text);
+        }
+
+        if (lang === 'cmake') {
+            return /\b(cmake_minimum_required|project|add_executable|add_library|target_link_libraries|find_package)\s*\(/i.test(text);
+        }
+
+        if (['cpp', 'c++', 'cc', 'cxx', 'hpp', 'h'].includes(lang)) {
+            return /#include\s*</.test(text)
+                || /\b(int|void|bool|auto|size_t)\s+\w+\s*\(/.test(text)
+                || /[;{}]/.test(text)
+                || /::/.test(text);
+        }
+
+        if (lang === 'text') {
+            return /\n/.test(text) && /[;{}()]/.test(text);
+        }
+
+        return true;
     }
 
     _needsCodeReflow(code) {

@@ -117,7 +117,7 @@ class ChatApp {
     formatMessage(text) {
         const codeBlocks = [];
         const normalized = this._normalizeMarkdownInput(text);
-        const withPlaceholders = normalized.replace(/(^|\n)```([a-zA-Z0-9_-]+)?[ \t]*\n([\s\S]*?)\n```[ \t]*(?=\n|$)/g, (_match, prefix, lang, code) => {
+        const withPlaceholders = normalized.replace(/(^|\n)[“”"']*```([a-zA-Z0-9_-]+)?[ \t]*[”"']*\n([\s\S]*?)\n[“”"']*```[ \t]*[”"']*(?=\n|$)/g, (_match, prefix, lang, code) => {
             const codeIndex = codeBlocks.length;
             const firstCodeLine = String(code || '').split('\n')[0] || '';
             const guessedLang = this._guessCodeLanguage(firstCodeLine);
@@ -255,7 +255,10 @@ class ChatApp {
         normalized = normalized.replace(/[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌🚀🎯✨💡]/gu, '');
         // 修复行内 fence："...：```cpp" / "return 0;}```"。
         normalized = normalized.replace(/([^\n])\s*[“”"']?\s*```([a-zA-Z0-9_-]*)/g, '$1\n```$2');
-        normalized = normalized.replace(/([^\n])```(?=\s*(?:\n|$))/g, '$1\n```');
+        normalized = normalized.replace(/```([a-zA-Z0-9_-]+)\s+(?=\S)/g, '```$1\n');
+        normalized = normalized.replace(/([^\n])```[”"']?(?=\s*(?:\n|$))/g, '$1\n```');
+        normalized = normalized.replace(/(^|\n)[“”"']+```([a-zA-Z0-9_-]*)\s*(?=\n|$)/g, '$1```$2');
+        normalized = normalized.replace(/(^|\n)```([a-zA-Z0-9_-]*)[”"']+\s*(?=\n|$)/g, '$1```$2');
         normalized = normalized.replace(/([:：])\s*[“”"']\s*(?=\n```[a-zA-Z0-9_-]*\s*\n)/g, '$1');
 
         // 修复模型把分隔线和标题粘在一起的场景：---### ...
@@ -303,12 +306,14 @@ class ChatApp {
             syntheticFence = false;
         };
 
-        const isFenceLine = (line) => /^```[a-zA-Z0-9_-]*\s*$/.test(line);
-        const isFenceClose = (line) => /^```\s*$/.test(line);
+        const normalizeFenceLine = (line) => String(line || '').trim().replace(/^[“”"']+|[“”"']+$/g, '');
+        const isFenceLine = (line) => /^```[a-zA-Z0-9_-]*\s*$/.test(normalizeFenceLine(line));
+        const isFenceClose = (line) => /^```\s*$/.test(normalizeFenceLine(line));
 
         for (const rawLine of lines) {
             const line = rawLine.replace(/\s+$/g, '');
             const trimmed = line.trim();
+            const normalizedFenceLine = normalizeFenceLine(trimmed);
 
             if (isFenceLine(trimmed)) {
                 if (syntheticFence) {
@@ -318,7 +323,7 @@ class ChatApp {
                         // synthetic 代码块后面的裸 ``` 视为同一个 closing，不再输出。
                         continue;
                     }
-                    output.push(trimmed);
+                    output.push(normalizedFenceLine);
                     inFence = true;
                     continue;
                 }
@@ -326,7 +331,7 @@ class ChatApp {
                 if (!inFence) {
                     closeSyntheticFence();
                     pendingLanguageHint = '';
-                    output.push(trimmed);
+                    output.push(normalizedFenceLine);
                     inFence = true;
                     continue;
                 }
@@ -339,7 +344,7 @@ class ChatApp {
                 }
 
                 // fence 内再次出现 ```cpp 这类脏行，按语言标记文本处理，避免提前闭合。
-                const nestedHint = trimmed.replace(/^```/, '').trim();
+                const nestedHint = normalizedFenceLine.replace(/^```/, '').trim();
                 if (nestedHint) {
                     output.push(nestedHint);
                 }
@@ -414,22 +419,29 @@ class ChatApp {
     _detectInlineCodeStartIndex(text) {
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return -1;
         if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return -1;
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return -1;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return -1;
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return -1;
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]?\s*$/.test(text)) return -1;
 
+        const commandPattern = /\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i;
         const patterns = [
             /(?:cpp|c\+\+)?\s*#include\s*</i,
             /\bint\s+main\s*\(/,
             /\bcmake_minimum_required\s*\(/i,
             /\bproject\s*\(/i,
-            /\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i,
+            commandPattern,
         ];
         let minIndex = -1;
         for (const pattern of patterns) {
             const match = pattern.exec(text);
             if (!match) continue;
             if (match.index <= 0) continue;
+            if (pattern === commandPattern) {
+                const tail = text.slice(match.index + match[0].length);
+                if (!/^\s+[$A-Za-z0-9_./:@=-]/.test(tail)) {
+                    continue;
+                }
+            }
             if (minIndex < 0 || match.index < minIndex) {
                 minIndex = match.index;
             }
@@ -444,7 +456,7 @@ class ChatApp {
 
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return true;
         if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return true;
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return true;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return true;
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return true;
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$/.test(text)) return true;
         if (/\bco_(?:return|await|yield)\b/.test(text) && !hasChinese) return true;
@@ -463,7 +475,7 @@ class ChatApp {
         if (!text) return 'text';
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text) || /\bint\s+main\s*\(/.test(text)) return 'cpp';
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return 'cmake';
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b/i.test(text)) return 'bash';
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return 'bash';
         return 'text';
     }
 
@@ -515,8 +527,13 @@ class ChatApp {
         if (isCppLike && this._needsCodeReflow(text)) {
             text = this._splitCollapsedCppCode(text);
             text = this._reindentBraceCode(text);
-        } else if (['bash', 'sh', 'zsh'].includes(lang) && this._needsCodeReflow(text)) {
-            text = text.replace(/;\s*(?=\S)/g, ';\n');
+        } else if (['bash', 'sh', 'zsh'].includes(lang)) {
+            text = text.replace(/(\bcd\s+\S*?)(cmake\s+\.\.)/gi, '$1\n$2');
+            if (this._needsCodeReflow(text)) {
+                text = text.replace(/;\s*(?=\S)/g, ';\n');
+                text = text.replace(/&&\s*(?=\S)/g, '&&\n');
+                text = text.replace(/(\bcd\s+\S+)(?=(?:cmake\s|make\b|\.\/|nc\b|telnet\b))/gi, '$1\n');
+            }
         } else if (lang === 'cmake' && this._needsCodeReflow(text)) {
             text = text.replace(/\)\s*(?=[A-Za-z_])/g, ')\n');
         }
@@ -571,7 +588,7 @@ class ChatApp {
         if (['bash', 'sh', 'zsh'].includes(lang)) {
             const lines = text.split('\n');
             const hasCommandLikeLine = lines.some((line) => {
-                const match = line.match(/^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make)\b([^\n]*)$/i);
+                const match = line.match(/^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b([^\n]*)$/i);
                 if (!match) return false;
                 const tail = String(match[2] || '');
                 if (!tail.trim()) return true;
@@ -798,7 +815,7 @@ class ChatApp {
             return `${prefix}<span class="code-token-comment">${comment}</span>`;
         });
 
-        html = html.replace(/\b(if|then|fi|for|in|do|done|while|case|esac|function|local|export|set|cd|echo|cat|grep|sed|awk|curl|wget|git|docker|kubectl|cmake|make|python|python3|pip|npm|pnpm|yarn)\b/g, '<span class="code-token-keyword">$1</span>');
+        html = html.replace(/\b(if|then|fi|for|in|do|done|while|case|esac|function|local|export|set|cd|echo|cat|grep|sed|awk|curl|wget|git|docker|kubectl|cmake|make|mkdir|ls|nc|telnet|python|python3|pip|npm|pnpm|yarn)\b/g, '<span class="code-token-keyword">$1</span>');
         html = html.replace(/(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}]+\})/g, '<span class="code-token-number">$1</span>');
 
         html = html.replace(/@@BASH_TOKEN_(\d+)@@/g, (_m, idx) => placeholders[Number(idx)] || '');

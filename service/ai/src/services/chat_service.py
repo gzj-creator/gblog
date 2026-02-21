@@ -287,17 +287,18 @@ def _normalize_answer_text(raw: str) -> str:
     for raw_line in text.split("\n"):
         line = raw_line.rstrip()
         stripped = line.strip()
+        fence_candidate = re.sub(r"^[“”\"']+|[“”\"']+$", "", stripped)
 
-        if stripped.startswith("```"):
+        if fence_candidate.startswith("```"):
             if in_code_block:
-                if re.match(r"^```\s*$", stripped):
+                if re.match(r"^```\s*$", fence_candidate):
                     code_lines.append("```")
                     flush_code()
                     in_code_block = False
                     synthetic_code_block = False
                 else:
                     # fence 内出现 ```cpp 这类脏行时，不提前结束 code block。
-                    nested_hint = re.sub(r"^```", "", stripped).strip()
+                    nested_hint = re.sub(r"^```", "", fence_candidate).strip()
                     if nested_hint:
                         code_lines.append(nested_hint)
             else:
@@ -305,8 +306,8 @@ def _normalize_answer_text(raw: str) -> str:
                 in_code_block = True
                 synthetic_code_block = False
                 pending_language_hint = ""
-                if re.match(r"^```[A-Za-z0-9_-]+\s*$", stripped):
-                    code_lines = [stripped]
+                if re.match(r"^```[A-Za-z0-9_-]+\s*$", fence_candidate):
+                    code_lines = [fence_candidate]
                 else:
                     code_lines = ["```"]
             continue
@@ -401,7 +402,10 @@ def _insert_structural_breaks(text: str) -> str:
     normalized = text
     # 修复行内 fence："...：```cpp" / "return 0;}```"。
     normalized = re.sub(r"([^\n])\s*[“”\"']?\s*```([A-Za-z0-9_-]*)", r"\1\n```\2", normalized)
-    normalized = re.sub(r"([^\n])```(?=\s*(?:\n|$))", r"\1\n```", normalized)
+    normalized = re.sub(r"```([A-Za-z0-9_-]+)\s+(?=\S)", r"```\1\n", normalized)
+    normalized = re.sub(r"([^\n])```[“”\"']?(?=\s*(?:\n|$))", r"\1\n```", normalized)
+    normalized = re.sub(r"(^|\n)[“”\"']+```([A-Za-z0-9_-]*)\s*(?=\n|$)", r"\1```\2", normalized)
+    normalized = re.sub(r"(^|\n)```([A-Za-z0-9_-]*)[“”\"']+\s*(?=\n|$)", r"\1```\2", normalized)
     normalized = re.sub(r"([:：])\s*[“”\"']\s*(?=\n```[A-Za-z0-9_-]*\s*\n)", r"\1", normalized)
     normalized = re.sub(r"([^\n#])\s*(#{1,6}\s)", r"\1\n\2", normalized)
     normalized = re.sub(r"([。！？!?;；:：])\s*([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
@@ -427,7 +431,7 @@ def _insert_structural_breaks(text: str) -> str:
         flags=re.IGNORECASE,
     )
     normalized = re.sub(
-        r"([:：。；;])\s*(\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b)",
+        r"([:：。；;])\s*(\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b)",
         r"\1\n\2",
         normalized,
         flags=re.IGNORECASE,
@@ -446,7 +450,7 @@ def _looks_like_code_line(line: str) -> bool:
         return True
     if re.search(r"^\s*(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", stripped):
         return True
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", stripped, flags=re.IGNORECASE):
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", stripped, flags=re.IGNORECASE):
         return True
     if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
         return True
@@ -495,7 +499,7 @@ def _normalize_language_hint(line: str) -> str:
 def _normalize_code_hint_line(line: str) -> str:
     cleaned = re.sub(r"^(?:cpp|c\+\+)\s*(?=#include\b)", "", line, flags=re.IGNORECASE)
     cleaned = re.sub(
-        r"^(?:bash|shell)\s*(?=\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b)",
+        r"^(?:bash|shell)\s*(?=\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b)",
         "",
         cleaned,
         flags=re.IGNORECASE,
@@ -511,7 +515,7 @@ def _find_inline_code_start(line: str) -> int:
         return -1
     if re.search(r"^(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", line):
         return -1
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", line, flags=re.IGNORECASE):
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", line, flags=re.IGNORECASE):
         return -1
     if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", line, flags=re.IGNORECASE):
         return -1
@@ -523,7 +527,7 @@ def _find_inline_code_start(line: str) -> int:
         r"\bint\s+main\s*\(",
         r"\bcmake_minimum_required\s*\(",
         r"\bproject\s*\(",
-        r"\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b",
+        r"\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b",
     )
 
     starts: List[int] = []
@@ -533,6 +537,10 @@ def _find_inline_code_start(line: str) -> int:
             continue
         if match.start() <= 0:
             continue
+        if pattern.startswith(r"\$?"):
+            tail = line[match.end():]
+            if not re.match(r"^\s+[$A-Za-z0-9_./:@=-]", tail):
+                continue
         starts.append(match.start())
 
     return min(starts) if starts else -1
@@ -547,7 +555,7 @@ def _guess_code_language(line: str) -> str:
         return "cpp"
     if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
         return "cmake"
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake)\b", stripped, flags=re.IGNORECASE):
+    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", stripped, flags=re.IGNORECASE):
         return "bash"
 
     return "text"

@@ -17,6 +17,7 @@ MIN_PASS_RATE="0.70"
 GENERATE_DOCS=false
 DOCS_ROOT_OVERRIDE=""
 DOCS_ROOT_EFFECTIVE=""
+HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-180}"
 
 usage() {
   cat <<'EOF'
@@ -132,6 +133,31 @@ run_compose() {
   GALAY_DOCS_ROOT_PATH="${DOCS_ROOT_EFFECTIVE}" docker compose -f "${COMPOSE_FILE}" "$@"
 }
 
+wait_for_health() {
+  local timeout="${1:-180}"
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "[WARN] curl not found, skip health waiting"
+    return 0
+  fi
+
+  local start_ts now_ts elapsed
+  start_ts="$(date +%s)"
+  while true; do
+    if curl -fsS --max-time 2 "http://127.0.0.1:8000/health" >/tmp/gblob-ai-health.json 2>/dev/null; then
+      echo "[INFO] Health check passed: $(cat /tmp/gblob-ai-health.json)"
+      return 0
+    fi
+
+    now_ts="$(date +%s)"
+    elapsed="$((now_ts - start_ts))"
+    if [[ "${elapsed}" -ge "${timeout}" ]]; then
+      echo "[ERROR] Health check timeout after ${timeout}s" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
 resolve_docs_root
 validate_docs_root
 
@@ -169,18 +195,9 @@ echo "[INFO] Starting service..."
 run_compose "${up_args[@]}"
 
 echo "[INFO] Waiting for service startup..."
-sleep 2
-
-if command -v curl >/dev/null 2>&1; then
-  for _ in $(seq 1 20); do
-    if curl -fsS --max-time 2 "http://127.0.0.1:8000/health" >/tmp/gblob-ai-health.json 2>/dev/null; then
-      echo "[INFO] Health check passed: $(cat /tmp/gblob-ai-health.json)"
-      break
-    fi
-    sleep 1
-  done
-else
-  echo "[WARN] curl not found, skip host health check"
+if ! wait_for_health "${HEALTH_TIMEOUT_SECONDS}"; then
+  echo "[ERROR] AI service did not become healthy in time; abort to avoid concurrent rebuild race." >&2
+  exit 1
 fi
 
 if [[ "${REBUILD_KB}" == "true" ]]; then
@@ -192,6 +209,7 @@ if [[ "${REBUILD_KB}" == "true" ]]; then
   fi
   echo "[INFO] Rebuilding knowledge base..."
   docker exec "${CONTAINER_NAME}" sh -lc "${rebuild_cmd}"
+  wait_for_health "${HEALTH_TIMEOUT_SECONDS}" || true
 fi
 
 if [[ "${RUN_EVAL}" == "true" ]]; then

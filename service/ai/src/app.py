@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from threading import Lock
 
 from fastapi import FastAPI
 
@@ -20,10 +21,39 @@ _vector_store: VectorStoreManager | None = None
 _chat_service: ChatService | None = None
 _index_service: IndexService | None = None
 _startup_error: str | None = None
+_vector_store_recovery_lock = Lock()
 
 
 def _service_unavailable_message(default_message: str) -> str:
     return _startup_error or default_message
+
+
+def _try_recover_vector_store() -> bool:
+    """尝试在运行时恢复向量索引可用性。"""
+    global _startup_error
+
+    if _vector_store is None:
+        return False
+    if _vector_store.is_ready:
+        return True
+
+    with _vector_store_recovery_lock:
+        if _vector_store.is_ready:
+            return True
+        try:
+            logger.info("Vector store not ready, attempting lazy recovery...")
+            # 请求路径只允许“加载已存在索引”，避免在线构建导致长阻塞和超时。
+            if not _vector_store.has_persisted_index():
+                logger.warning("No persisted vector index for lazy recovery")
+                return False
+            _vector_store.load_existing()
+            _startup_error = None
+            logger.info("Vector store lazy recovery succeeded")
+            return True
+        except Exception as e:
+            _startup_error = f"Vector store initialization failed: {e}"
+            logger.exception(_startup_error)
+            return False
 
 
 def get_vector_store() -> VectorStoreManager:
@@ -32,6 +62,8 @@ def get_vector_store() -> VectorStoreManager:
             _service_unavailable_message("Vector store is not initialized")
         )
     if not _vector_store.is_ready:
+        if _try_recover_vector_store():
+            return _vector_store
         raise ServiceUnavailableError(
             _service_unavailable_message("Vector index is not ready, please rebuild index")
         )
@@ -44,6 +76,8 @@ def get_chat_service() -> ChatService:
             _service_unavailable_message("Chat service is not initialized")
         )
     if _vector_store is None or not _vector_store.is_ready:
+        if _try_recover_vector_store():
+            return _chat_service
         raise ServiceUnavailableError(
             _service_unavailable_message("Vector index is not ready, chat API is unavailable")
         )

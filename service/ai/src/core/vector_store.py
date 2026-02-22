@@ -72,6 +72,16 @@ class VectorStoreManager:
     def is_ready(self) -> bool:
         return self._store is not None
 
+    def has_persisted_index(self) -> bool:
+        """是否存在可加载的持久化索引数据。"""
+        return self._exists()
+
+    def load_existing(self) -> None:
+        """仅加载已存在索引；不存在则抛出异常。"""
+        if not self._exists():
+            raise VectorStoreError("No persisted vector index found")
+        self._load()
+
     # ------------------------------------------------------------------
     # 内部
     # ------------------------------------------------------------------

@@ -26,9 +26,8 @@ class VectorStoreManager:
     # ------------------------------------------------------------------
     def initialize(self, force_rebuild: bool = False) -> None:
         if force_rebuild:
-            logger.info("Force rebuild enabled, removing existing vector store first...")
-            if Path(self._persist_dir).exists():
-                shutil.rmtree(self._persist_dir)
+            logger.info("Force rebuild enabled, clearing existing vector store first...")
+            self._clear_persist_dir()
             self._build()
         elif not self._exists():
             logger.info("Building vector store from documents...")
@@ -58,8 +57,7 @@ class VectorStoreManager:
 
     def rebuild(self) -> None:
         logger.info("Rebuilding vector store...")
-        if Path(self._persist_dir).exists():
-            shutil.rmtree(self._persist_dir)
+        self._clear_persist_dir()
         self._build()
 
     # ------------------------------------------------------------------
@@ -80,6 +78,29 @@ class VectorStoreManager:
     def _exists(self) -> bool:
         p = Path(self._persist_dir)
         return p.exists() and any(p.iterdir())
+
+    def _clear_persist_dir(self) -> None:
+        """清空持久化目录内容，但保留目录本身。
+
+        在 Docker bind mount/volume 场景下，目录本身可能是挂载点，直接 rmtree
+        会触发 `Device or resource busy`。因此仅删除目录内文件，避免删除挂载点。
+        """
+        persist = Path(self._persist_dir)
+        if not persist.exists():
+            persist.mkdir(parents=True, exist_ok=True)
+            return
+
+        if not persist.is_dir():
+            raise VectorStoreError(f"Vector store path is not a directory: {persist}")
+
+        for child in persist.iterdir():
+            try:
+                if child.is_dir() and not child.is_symlink():
+                    shutil.rmtree(child)
+                else:
+                    child.unlink()
+            except FileNotFoundError:
+                continue
 
     def _load(self) -> None:
         self._store = Chroma(

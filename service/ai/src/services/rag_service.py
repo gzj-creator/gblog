@@ -46,7 +46,8 @@ Galay 是一个基于 C++20/23 协程的高性能异步网络框架，包含以�
     - IO 调度器：`runtime.getNextIOScheduler()`
     - 计算调度器：`runtime.getNextComputeScheduler()`。
 14. 协程返回类型统一使用 `Coroutine`；不要输出 `Task<void>` / `Task<T>`。
-15. 严禁使用协程 lambda（如 `auto task = [](...) { co_await ... };`），必须使用具名 `Coroutine` 函数。"""
+15. 严禁使用协程 lambda（如 `auto task = [](...) { co_await ... };`），必须使用具名 `Coroutine` 函数。
+16. `Runtime` 不是单例，不存在 `Runtime::getInstance()`，应直接创建对象（如 `galay::kernel::Runtime runtime;`）。"""
 
 
 class RAGService:

@@ -38,6 +38,17 @@ _EMPTY_CAPTURE_COROUTINE_LAMBDA_START_RE = re.compile(
     r"\((?P<params>[^)]*)\)\s*(?:->\s*[^{]+)?\s*\{\s*$"
 )
 _COROUTINE_LAMBDA_END_RE = re.compile(r"^\s*};\s*$")
+_RUNTIME_SINGLETON_REF_ASSIGN_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?:auto|(?:galay::kernel::)?Runtime)\s*&\s*"
+    r"(?P<name>[A-Za-z_]\w*)\s*=\s*(?:galay::kernel::)?Runtime::getInstance\(\s*\)\s*;\s*$"
+)
+_RUNTIME_SINGLETON_PTR_ASSIGN_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?:auto|(?:galay::kernel::)?Runtime)\s*\*\s*"
+    r"(?P<name>[A-Za-z_]\w*)\s*=\s*(?:&\s*)?(?:galay::kernel::)?Runtime::getInstance\(\s*\)\s*;\s*$"
+)
+_RUNTIME_SINGLETON_CALL_RE = re.compile(
+    r"(?:galay::kernel::)?Runtime::getInstance\(\s*\)"
+)
 
 
 class ChatService:
@@ -337,6 +348,14 @@ def _enforce_framework_output_consistency(text: str) -> str:
             "说明：协程逻辑不要使用 lambda（避免生命周期问题），请使用具名 `Coroutine` 函数。"
         )
 
+    runtime_fixed, runtime_rewritten = _rewrite_runtime_singleton_usage(fixed)
+    if runtime_rewritten:
+        fixed = runtime_fixed
+        changed = True
+        notes.append(
+            "说明：`Runtime` 不是单例，没有 `Runtime::getInstance()`，请使用 `galay::kernel::Runtime runtime;`。"
+        )
+
     for note in notes:
         if note not in fixed:
             fixed = f"{fixed.rstrip()}\n\n{note}"
@@ -395,6 +414,30 @@ def _rewrite_empty_capture_coroutine_lambdas(text: str) -> tuple[str, bool]:
         idx = end + 1
 
     return "\n".join(output), rewritten
+
+
+def _rewrite_runtime_singleton_usage(text: str) -> tuple[str, bool]:
+    fixed = text
+    before = fixed
+
+    rewritten_names: List[str] = []
+
+    def _replace_runtime_ref(match: re.Match[str]) -> str:
+        name = match.group("name")
+        if name not in rewritten_names:
+            rewritten_names.append(name)
+        return f"{match.group('indent')}galay::kernel::Runtime {name};"
+
+    fixed = _RUNTIME_SINGLETON_REF_ASSIGN_RE.sub(_replace_runtime_ref, fixed)
+    fixed = _RUNTIME_SINGLETON_PTR_ASSIGN_RE.sub(_replace_runtime_ref, fixed)
+
+    fallback_name = rewritten_names[0] if rewritten_names else "runtime"
+    fixed = _RUNTIME_SINGLETON_CALL_RE.sub(fallback_name, fixed)
+
+    for name in rewritten_names:
+        fixed = fixed.replace(f"{name}->", f"{name}.")
+
+    return fixed, fixed != before
 
 def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:
     if not text:

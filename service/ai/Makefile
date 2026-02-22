@@ -1,4 +1,4 @@
-.PHONY: install install-linux run build-index build-index-force rebuild-kb eval-kb apply-doc-style verify-doc-style verify-format test docker-build docker-up docker-down clean
+.PHONY: install install-linux run build-index build-index-force rebuild-kb eval-kb eval-kb-daily apply-doc-style verify-doc-style verify-example-consistency verify-format test docker-build docker-up docker-down clean
 
 PYTHON ?= python3
 
@@ -23,11 +23,17 @@ rebuild-kb:
 eval-kb:
 	$(PYTHON) scripts/evaluate_kb.py --mode all
 
+eval-kb-daily:
+	$(PYTHON) scripts/run_daily_eval.py
+
 apply-doc-style:
 	$(PYTHON) scripts/apply_doc_style_prompt.py
 
 verify-doc-style:
 	$(PYTHON) scripts/verify_docs_prompt_style.py
+
+verify-example-consistency:
+	$(PYTHON) scripts/verify_example_consistency.py
 
 verify-format:
 	$(PYTHON) scripts/verify_docs_prompt_style.py

@@ -489,6 +489,7 @@ int main() {
                                 label: 'Include',
                                 filename: 'websocket_server.cpp',
                                 code: `#include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpRouter.h"
 #include "galay-http/kernel/websocket/WsUpgrade.h"
 #include "galay-http/kernel/websocket/WsConn.h"
 #include "galay-http/kernel/websocket/WsWriterSetting.h"
@@ -513,44 +514,42 @@ Coroutine handleWs(WsConn& wsConn) {
     }
 
     co_await wsConn.close();
+    co_return;
 }
 
-Coroutine handleHttp(HttpConn conn) {
-    auto reader = conn.getReader();
-    HttpRequest request;
-    auto req = co_await reader.getRequest(request);
-    if (!req) {
+Coroutine wsHandler(HttpConn& conn, HttpRequest req) {
+    auto upgrade = WsUpgrade::handleUpgrade(req);
+    auto writer = conn.getWriter();
+    co_await writer.sendResponse(upgrade.response);
+    if (!upgrade.success) {
         co_await conn.close();
         co_return;
     }
 
-    if (request.header().uri() == "/ws") {
-        auto upgrade = WsUpgrade::handleUpgrade(request);
-        auto writer = conn.getWriter();
-        co_await writer.sendResponse(upgrade.response);
-        if (!upgrade.success) {
-            co_await conn.close();
-            co_return;
-        }
+    WsConn wsConn = WsConn::from(std::move(conn), true);
+    co_await handleWs(wsConn).wait();
+    co_return;
+}
 
-        WsConn wsConn = WsConn::from(std::move(conn), true);
-        co_await handleWs(wsConn).wait();
-        co_return;
-    }
-
+Coroutine indexHandler(HttpConn& conn, HttpRequest req) {
     auto writer = conn.getWriter();
     auto response = Http1_1ResponseBuilder::ok().text("Use ws://localhost:8080/ws").build();
     co_await writer.sendResponse(response);
     co_await conn.close();
+    co_return;
 }
 
 int main() {
+    HttpRouter router;
+    router.addHandler<HttpMethod::GET>("/ws", wsHandler);
+    router.addHandler<HttpMethod::GET>("/", indexHandler);
+
     HttpServerConfig config;
     config.host = "0.0.0.0";
     config.port = 8080;
 
     HttpServer server(config);
-    server.start(handleHttp);
+    server.start(std::move(router));
     return 0;
 }`
                             },
@@ -559,6 +558,7 @@ int main() {
                                 label: 'Module',
                                 filename: 'websocket_server.module.cpp',
                                 code: `import galay.http;
+import galay.websocket;
 #include <string>
 
 using namespace galay::http;
@@ -579,44 +579,42 @@ Coroutine handleWs(WsConn& wsConn) {
     }
 
     co_await wsConn.close();
+    co_return;
 }
 
-Coroutine handleHttp(HttpConn conn) {
-    auto reader = conn.getReader();
-    HttpRequest request;
-    auto req = co_await reader.getRequest(request);
-    if (!req) {
+Coroutine wsHandler(HttpConn& conn, HttpRequest req) {
+    auto upgrade = WsUpgrade::handleUpgrade(req);
+    auto writer = conn.getWriter();
+    co_await writer.sendResponse(upgrade.response);
+    if (!upgrade.success) {
         co_await conn.close();
         co_return;
     }
 
-    if (request.header().uri() == "/ws") {
-        auto upgrade = WsUpgrade::handleUpgrade(request);
-        auto writer = conn.getWriter();
-        co_await writer.sendResponse(upgrade.response);
-        if (!upgrade.success) {
-            co_await conn.close();
-            co_return;
-        }
+    WsConn wsConn = WsConn::from(std::move(conn), true);
+    co_await handleWs(wsConn).wait();
+    co_return;
+}
 
-        WsConn wsConn = WsConn::from(std::move(conn), true);
-        co_await handleWs(wsConn).wait();
-        co_return;
-    }
-
+Coroutine indexHandler(HttpConn& conn, HttpRequest req) {
     auto writer = conn.getWriter();
     auto response = Http1_1ResponseBuilder::ok().text("Use ws://localhost:8080/ws").build();
     co_await writer.sendResponse(response);
     co_await conn.close();
+    co_return;
 }
 
 int main() {
+    HttpRouter router;
+    router.addHandler<HttpMethod::GET>("/ws", wsHandler);
+    router.addHandler<HttpMethod::GET>("/", indexHandler);
+
     HttpServerConfig config;
     config.host = "0.0.0.0";
     config.port = 8080;
 
     HttpServer server(config);
-    server.start(handleHttp);
+    server.start(std::move(router));
     return 0;
 }`
                             }

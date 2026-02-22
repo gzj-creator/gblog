@@ -103,10 +103,31 @@ function generatePlaceholderContent(article) {
 
         <pre><code>// 示例代码
 #include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpRouter.h"
+#include "galay-http/utils/Http1_1ResponseBuilder.h"
+
+using namespace galay::http;
+
+Coroutine helloHandler(HttpConn& conn, HttpRequest req) {
+    auto response = Http1_1ResponseBuilder::ok()
+        .text("Hello, Galay!")
+        .build();
+
+    auto writer = conn.getWriter();
+    co_await writer.sendResponse(response);
+    co_return;
+}
 
 int main() {
-    HttpServer server;
-    server.start();
+    HttpRouter router;
+    router.addHandler<HttpMethod::GET>("/", helloHandler);
+
+    HttpServerConfig config;
+    config.host = "0.0.0.0";
+    config.port = 8080;
+
+    HttpServer server(config);
+    server.start(std::move(router));
     return 0;
 }</code></pre>
 

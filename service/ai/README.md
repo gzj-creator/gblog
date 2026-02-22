@@ -179,6 +179,29 @@ python scripts/evaluate_kb.py --mode all
 service/ai/eval/benchmark_cases.json
 ```
 
+每日回放评测（含历史归档 + 告警）：
+
+```bash
+# 仅失败时告警（读取 EVAL_ALERT_WEBHOOK）
+make eval-kb-daily
+
+# 指定服务地址与阈值
+python scripts/run_daily_eval.py \
+  --base-url http://127.0.0.1:8000 \
+  --min-pass-rate 0.85
+```
+
+常见 cron 配置（每天 09:00 执行）：
+
+```bash
+0 9 * * * cd /path/to/service/ai && /usr/bin/python3 scripts/run_daily_eval.py --base-url http://127.0.0.1:8000 --min-pass-rate 0.85 >> logs/daily-eval.log 2>&1
+```
+
+说明：
+- 历史报告保存到 `service/ai/eval/history/daily-eval-*.json`
+- webhook 从 `--alert-webhook` 或环境变量 `EVAL_ALERT_WEBHOOK` 读取
+- 默认仅失败告警，`--notify-on-pass` 可开启成功告警
+
 ### 7. 一键部署（Docker Compose）
 
 ```bash

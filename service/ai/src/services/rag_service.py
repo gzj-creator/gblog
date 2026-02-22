@@ -42,15 +42,50 @@ Galay 是一个基于 C++20/23 协程的高性能异步网络框架，包含以�
 10. 代码必须使用独立 fenced code block（```cpp ... ```），不要把代码和正文写在同一行。
 11. 回答“支持哪些能力/调用模式/特性”时，优先穷举文档中列出的能力点，并保留原始术语（如 Unary、流式、服务发现）。
 12. 严禁编造不存在的 API（例如 `IoContext`、`ioContext`、`IoContext::GetInstance()`）。
-13. 涉及调度器初始化时，使用 `Runtime` 获取调度器：
+13. 仅在讲解 `galay-kernel` 或显式需要手动调度器时，才使用 `Runtime` 获取调度器：
     - IO 调度器：`runtime.getNextIOScheduler()`
     - 计算调度器：`runtime.getNextComputeScheduler()`。
-14. 协程返回类型统一使用 `Coroutine`；不要输出 `Task<void>` / `Task<T>`。
-15. 严禁使用协程 lambda（如 `auto task = [](...) { co_await ... };`），必须使用具名 `Coroutine` 函数。
-16. `Runtime` 不是单例，不存在 `Runtime::getInstance()`，应直接创建对象（如 `galay::kernel::Runtime runtime;`）。
-17. 回答 `galay-http` 的安装/最小示例时，依赖清单必须包含 `galay-utils`（通常为 `kernel + utils + http`，TLS 场景再加 `ssl`）。
-18. 只要给 C++ 代码示例，必须同时给两段代码：`#include` 版本 + `import` 版本（各自独立 fenced code block）。
-19. C++ 代码排版必须统一：4 空格缩进，花括号对齐，`#include` 预处理行顶格。"""
+14. 涉及 `HttpServer` 示例时，必须严格使用文档流程：
+    - `HttpRouter router;`
+    - `HttpServerConfig config;`
+    - `HttpServer server(config);`
+    - `server.start(std::move(router));`
+    严禁输出未文档化写法：`HttpServer server;`、`HttpServer(...scheduler...)`、`server.get/post/...`、`server.start(8080)`。
+15. 协程返回类型统一使用 `Coroutine`；不要输出 `Task<void>` / `Task<T>`。
+16. 严禁使用协程 lambda（如 `auto task = [](...) { co_await ... };`），必须使用具名 `Coroutine` 函数。
+17. `Runtime` 不是单例，不存在 `Runtime::getInstance()`，应直接创建对象（如 `galay::kernel::Runtime runtime;`）。
+18. 回答 `galay-http` 的安装/最小示例时，依赖清单必须包含 `galay-utils`（通常为 `kernel + utils + http`，TLS 场景再加 `ssl`）。
+19. 只要给 C++ 代码示例，必须同时给两段代码：`#include` 版本 + `import` 版本（各自独立 fenced code block）。
+20. C++ 代码排版必须统一：4 空格缩进，花括号对齐，`#include` 预处理行顶格。
+21. 回答“用法/示例/demo/example/快速开始”时，必须优先依据 demo/example/test/README/快速开始/使用示例中已有调用链；若示例没有该写法，必须明确说“示例中未提供”，不要补脑编造。
+22. 以下调用链必须与示例保持一致：
+    - `galay-http`：`HttpServerConfig` + `HttpRouter` + `HttpServer server(config)` + `server.start(std::move(router))`
+    - `galay-rpc`：`RpcServerConfig` + `RpcServer server(config)` + `server.start()`
+    - `galay-redis`：`Runtime` + `runtime.getNextIOScheduler()` + `RedisClient client(scheduler)`
+    - `galay-mysql`：`AsyncMysqlClient client(scheduler)`（异步场景）
+    - `galay-mongo`：`AsyncMongoClient client(scheduler)`（异步场景）
+    - `galay-etcd`：`AsyncEtcdClient client(scheduler)`（异步场景）
+    - `galay-mcp`：`McpStdioServer::run()` 或 `McpHttpServer(host, port).start()`。"""
+
+_USAGE_QUERY_RE = re.compile(
+    r"(示例|demo|example|sample|用法|怎么用|如何用|如何使用|入门|快速开始|最小示例|最小用例|代码示例|样例)",
+    re.IGNORECASE,
+)
+_EXAMPLE_SOURCE_STRONG_HINTS = (
+    "/example/",
+    "/examples/",
+    "/demo/",
+    "/demos/",
+    "/test/",
+    "/tests/",
+)
+_EXAMPLE_SOURCE_WEAK_HINTS = (
+    "readme.md",
+    "快速开始",
+    "使用示例",
+    "示例代码",
+    "使用指南",
+)
 
 
 class RAGService:
@@ -80,6 +115,7 @@ class RAGService:
             return []
 
         project_hint = _extract_project_hint(query)
+        usage_intent = is_usage_query(query)
         candidate_k = min(max(k * 32, 64), 256)
         dense = self._vector_store.search_with_score(query, k=candidate_k)
         if not dense:
@@ -92,8 +128,16 @@ class RAGService:
             lexical_score = _lexical_overlap_score(doc.page_content, terms)
             source_boost = _source_path_boost(doc, terms)
             project_boost = _project_hint_boost(doc, project_hint)
+            example_boost = _example_source_boost(doc)
             # dense 为主，关键词为辅；避免被噪声关键词完全盖过语义召回。
-            final_score = dense_score * 0.65 + lexical_score * 0.2 + source_boost * 0.05 + project_boost * 0.1
+            example_weight = 0.18 if usage_intent else 0.08
+            final_score = (
+                dense_score * 0.52
+                + lexical_score * 0.16
+                + source_boost * 0.04
+                + project_boost * 0.1
+                + example_boost * example_weight
+            )
             key = _doc_key(doc)
             old = rank_map.get(key)
             if old is None or final_score > old[0]:
@@ -101,7 +145,12 @@ class RAGService:
 
         # 关键词兜底：从全量 chunks 再做一次词项匹配，提升明确术语的命中率。
         if terms:
-            for score, doc in self._lexical_fallback(terms, project_hint, limit=max(24, k * 8)):
+            for score, doc in self._lexical_fallback(
+                terms,
+                project_hint,
+                usage_intent=usage_intent,
+                limit=max(24, k * 8),
+            ):
                 key = _doc_key(doc)
                 old = rank_map.get(key)
                 if old is None or score > old[0]:
@@ -133,6 +182,7 @@ class RAGService:
         self,
         terms: List[str],
         project_hint: str | None = None,
+        usage_intent: bool = False,
         limit: int = 24,
     ) -> List[Tuple[float, Document]]:
         docs = self._get_all_docs_for_rerank()
@@ -146,7 +196,9 @@ class RAGService:
                 continue
             source_boost = _source_path_boost(doc, terms)
             project_boost = _project_hint_boost(doc, project_hint)
-            score = lex * 0.75 + source_boost * 0.1 + project_boost * 0.15
+            example_boost = _example_source_boost(doc)
+            example_weight = 0.15 if usage_intent else 0.05
+            score = lex * 0.65 + source_boost * 0.08 + project_boost * 0.12 + example_boost * example_weight
             scored.append((score, doc))
 
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -189,9 +241,16 @@ class RAGService:
 
     def _build_messages(self, query: str, context_docs: List[Document]) -> list:
         """构建 LLM 消息列表"""
-        context = "\n\n".join(doc.page_content for doc in context_docs)
+        context = format_context_docs(context_docs)
+        guardrail = ""
+        if is_usage_query(query) and not has_example_source(context_docs):
+            guardrail = (
+                "\n补充约束：当前检索上下文没有命中 demo/example/test/快速开始等示例来源。"
+                "你必须避免编造 API；若文档未给出可执行示例，明确说明“示例中未提供该写法”。"
+            )
 
         system_content = f"""{SYSTEM_PROMPT}
+{guardrail}
 
 请基于以下文档内容回答用户问题：
 
@@ -240,6 +299,42 @@ def _extract_project_hint(query: str) -> str | None:
     return match.group(1).lower()
 
 
+def is_usage_query(text: str) -> bool:
+    return bool(_USAGE_QUERY_RE.search(str(text or "")))
+
+
+def is_example_source_path(source: str) -> bool:
+    normalized = str(source or "").replace("\\", "/").lower()
+    if not normalized:
+        return False
+    if any(hint in normalized for hint in _EXAMPLE_SOURCE_STRONG_HINTS):
+        return True
+    if any(hint in normalized for hint in _EXAMPLE_SOURCE_WEAK_HINTS):
+        return True
+    return False
+
+
+def has_example_source(docs: List[Document]) -> bool:
+    for doc in docs:
+        source = str(doc.metadata.get("source", ""))
+        if is_example_source_path(source):
+            return True
+    return False
+
+
+def format_context_docs(context_docs: List[Document]) -> str:
+    sections: List[str] = []
+    for index, doc in enumerate(context_docs, start=1):
+        project = str(doc.metadata.get("project", "unknown"))
+        source = str(doc.metadata.get("source", "unknown"))
+        header = f"[{index}] project={project} source={source}"
+        body = str(doc.page_content or "").strip()
+        if not body:
+            continue
+        sections.append(f"{header}\n{body}")
+    return "\n\n".join(sections)
+
+
 def _lexical_overlap_score(content: str, terms: List[str]) -> float:
     if not terms:
         return 0.0
@@ -271,6 +366,18 @@ def _source_path_boost(doc: Document, terms: List[str]) -> float:
             if term in source:
                 hits += 1
     return min(1.0, hits / max(1, len(terms)))
+
+
+def _example_source_boost(doc: Document) -> float:
+    source = str(doc.metadata.get("source", ""))
+    normalized = source.replace("\\", "/").lower()
+    if not normalized:
+        return 0.0
+    if any(hint in normalized for hint in _EXAMPLE_SOURCE_STRONG_HINTS):
+        return 1.0
+    if any(hint in normalized for hint in _EXAMPLE_SOURCE_WEAK_HINTS):
+        return 0.65
+    return 0.0
 
 
 def _project_hint_boost(doc: Document, project_hint: str | None) -> float:

@@ -86,5 +86,61 @@
     "search_expected_files": ["README.md"],
     "chat_expected_keywords": ["Runtime", "Protocol", "Data"],
     "chat_expected_projects": ["galay-ecosystem"]
+  },
+  {
+    "id": "http-minimal-usage",
+    "query": "给我一个 galay-http 最小服务端示例",
+    "search_expected_projects": ["galay-http"],
+    "search_expected_files": ["3-使用指南.md"],
+    "chat_expected_keywords": ["HttpServerConfig", "HttpRouter", "server.start(std::move(router))"],
+    "chat_expected_projects": ["galay-http"]
+  },
+  {
+    "id": "rpc-minimal-usage",
+    "query": "给我一个 galay-rpc 服务端最小示例",
+    "search_expected_projects": ["galay-rpc"],
+    "search_expected_files": ["03-使用指南.md"],
+    "chat_expected_keywords": ["RpcServerConfig", "RpcServer server(config)", "server.start()"],
+    "chat_expected_projects": ["galay-rpc"]
+  },
+  {
+    "id": "redis-minimal-usage",
+    "query": "给我一个 galay-redis 最小用法示例",
+    "search_expected_projects": ["galay-redis"],
+    "search_expected_files": ["01-快速开始.md"],
+    "chat_expected_keywords": ["RedisClient client(scheduler)", "runtime.getNextIOScheduler()", "runtime.start()"],
+    "chat_expected_projects": ["galay-redis"]
+  },
+  {
+    "id": "mysql-async-minimal-usage",
+    "query": "给我一个 galay-mysql 异步最小示例",
+    "search_expected_projects": ["galay-mysql"],
+    "search_expected_files": ["01-快速开始.md"],
+    "chat_expected_keywords": ["AsyncMysqlClient client(scheduler)", "runtime.getNextIOScheduler()", "client.connect"],
+    "chat_expected_projects": ["galay-mysql"]
+  },
+  {
+    "id": "mongo-async-minimal-usage",
+    "query": "给我一个 galay-mongo 异步最小示例",
+    "search_expected_projects": ["galay-mongo"],
+    "search_expected_files": ["03-使用指南.md"],
+    "chat_expected_keywords": ["AsyncMongoClient client(scheduler)", "client.connect(cfg)", "client.close()"],
+    "chat_expected_projects": ["galay-mongo"]
+  },
+  {
+    "id": "etcd-async-minimal-usage",
+    "query": "给我一个 galay-etcd 异步最小示例",
+    "search_expected_projects": ["galay-etcd"],
+    "search_expected_files": ["01-快速开始.md"],
+    "chat_expected_keywords": ["AsyncEtcdClient client(scheduler)", "client.connect()", "client.close()"],
+    "chat_expected_projects": ["galay-etcd"]
+  },
+  {
+    "id": "mcp-http-minimal-usage",
+    "query": "给我一个 galay-mcp http server 最小示例",
+    "search_expected_projects": ["galay-mcp"],
+    "search_expected_files": ["06-HTTP服务器测试.md"],
+    "chat_expected_keywords": ["McpHttpServer", "server.start()", "host"],
+    "chat_expected_projects": ["galay-mcp"]
   }
 ]

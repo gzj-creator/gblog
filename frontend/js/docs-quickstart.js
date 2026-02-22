@@ -144,7 +144,10 @@ const DOCS_QUICKSTART_MAP = {
                 '',
                 'using namespace galay::rpc;',
                 '',
-                '// RpcServer server({"0.0.0.0", 9000});'
+                'RpcServerConfig config;',
+                'config.host = "0.0.0.0";',
+                'config.port = 9000;',
+                'RpcServer server(config);'
             ]
         }
     },

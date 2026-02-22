@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from pathlib import Path
 import re
 from typing import Any, AsyncGenerator, Dict, List
 
@@ -9,7 +10,13 @@ from src.config import settings
 from src.core.markdown_blocks import markdown_to_blocks
 from src.core.markdown_normalizer import normalize_markdown_content
 from src.core.vector_store import VectorStoreManager
-from src.services.rag_service import RAGService, SYSTEM_PROMPT
+from src.services.rag_service import (
+    RAGService,
+    SYSTEM_PROMPT,
+    format_context_docs,
+    has_example_source,
+    is_usage_query,
+)
 from src.utils.exceptions import ChatServiceError
 from src.utils.logger import get_logger
 
@@ -19,6 +26,7 @@ MAX_SESSIONS = 100
 MAX_HISTORY_ROUNDS = 20
 STREAM_EMIT_MIN_CHARS = 16
 STREAM_EMIT_MAX_CHARS = 120
+USAGE_CODE_MIN_CONFIDENCE = 0.45
 
 _FORBIDDEN_SCHEDULER_APIS = (
     re.compile(r"\b(?:IoContext|IOContext)\s*::\s*GetInstance\s*\(\s*\)", re.IGNORECASE),
@@ -49,6 +57,55 @@ _RUNTIME_SINGLETON_PTR_ASSIGN_RE = re.compile(
 _RUNTIME_SINGLETON_CALL_RE = re.compile(
     r"(?:galay::kernel::)?Runtime::getInstance\(\s*\)"
 )
+_HTTP_SERVER_DECL_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)HttpServer\s+(?P<name>[A-Za-z_]\w*)\s*"
+    r"(?P<ctor>\((?P<args>[^)]*)\))?\s*;\s*$"
+)
+_HTTP_SERVER_START_CALL_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?P<name>[A-Za-z_]\w*)\s*\.\s*start\s*"
+    r"\(\s*(?P<arg>[^)]*)\)\s*;\s*$"
+)
+_HTTP_SERVER_ROUTE_CALL_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?P<name>[A-Za-z_]\w*)\s*\.\s*"
+    r"(?P<method>get|post|put|del|delete|patch|head|options)\s*"
+    r"\((?P<args>.*)\)\s*;\s*$",
+    re.IGNORECASE,
+)
+_HTTP_ROUTER_DECL_RE = re.compile(r"(?m)^\s*HttpRouter\s+\w+\s*;\s*$")
+_HTTP_SERVER_SCHEDULER_ARG_TOKENS = (
+    "scheduler",
+    "getnextioscheduler",
+    "getnextcomputescheduler",
+)
+_HTTP_METHOD_MAP = {
+    "get": "GET",
+    "post": "POST",
+    "put": "PUT",
+    "del": "DELETE",
+    "delete": "DELETE",
+    "patch": "PATCH",
+    "head": "HEAD",
+    "options": "OPTIONS",
+}
+_RPC_SERVER_DECL_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)RpcServer\s+(?P<name>[A-Za-z_]\w*)\s*"
+    r"(?P<ctor>\((?P<args>[^)]*)\))?\s*;\s*$"
+)
+_RPC_SERVER_START_CALL_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?P<name>[A-Za-z_]\w*)\s*\.\s*start\s*"
+    r"\(\s*(?P<arg>[^)]*)\)\s*;\s*$"
+)
+_RPC_SERVER_CONFIG_DECL_RE = re.compile(
+    r"(?m)^\s*RpcServerConfig\s+[A-Za-z_]\w*\s*;\s*$"
+)
+_SCHEDULER_CLIENT_DEFAULT_CTOR_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)(?P<type>"
+    r"(?:galay::redis::)?RedisClient|"
+    r"(?:galay::mysql::)?AsyncMysqlClient|"
+    r"(?:galay::mongo::)?AsyncMongoClient|"
+    r"(?:galay::etcd::)?AsyncEtcdClient"
+    r")\s+(?P<name>[A-Za-z_]\w*)\s*;\s*$"
+)
 _HTTP_KERNEL_CLONE_LINE_RE = re.compile(
     r"(?m)^(?P<indent>\s*)git\s+clone\s+https://github\.com/gzj-creator/galay-kernel\.git\s*$"
 )
@@ -64,6 +121,7 @@ _CPP_FENCE_BLOCK_RE = re.compile(
 _CPP_INCLUDE_LINE_RE = re.compile(r'^\s*#\s*include\s*[<"](?P<header>[^>"]+)[>"]\s*$')
 _CPP_IMPORT_LINE_RE = re.compile(r'^\s*import\s+(?P<module>[A-Za-z_][A-Za-z0-9_.]*)\s*;\s*$')
 _CPP_LANGS = {"cpp", "c++", "cc", "cxx", "hpp", "h"}
+_FENCED_CODE_BLOCK_RE = re.compile(r"(?ms)```.*?```")
 _GALAY_INCLUDE_PREFIX_TO_MODULE = (
     ("galay-kernel/", "galay.kernel"),
     ("galay-ssl/", "galay.ssl"),
@@ -111,12 +169,16 @@ class ChatService:
     def chat(self, message: str, session_id: str = "default") -> Dict[str, Any]:
         """带会话记忆的对话"""
         try:
-            docs = self._rag.retrieve(message, k=4)
+            docs_with_score = self._rag.retrieve_with_score(message, k=4)
+            docs = [doc for doc, _ in docs_with_score]
             sources = _extract_sources(docs)
             messages = self._build_messages(message, docs, session_id)
 
             response = self._llm.invoke(messages)
             answer = _normalize_answer_text(_extract_message_text(response))
+            answer = _downgrade_answer_when_example_missing(answer, message, docs)
+            answer = _enforce_confidence_gate_for_code(answer, message, docs_with_score)
+            answer = _ensure_source_citations(answer, docs)
             if not answer.strip():
                 answer = "抱歉，模型返回了空内容，请稍后重试。"
             blocks = _build_answer_blocks(answer)
@@ -139,7 +201,8 @@ class ChatService:
     ) -> AsyncGenerator[dict, None]:
         """带会话记忆的流式对话"""
         try:
-            docs = self._rag.retrieve(message, k=4)
+            docs_with_score = self._rag.retrieve_with_score(message, k=4)
+            docs = [doc for doc, _ in docs_with_score]
             sources = _extract_sources(docs)
             messages = self._build_messages(message, docs, session_id)
 
@@ -171,6 +234,9 @@ class ChatService:
                 fallback = self._llm.invoke(messages)
                 raw_answer = _extract_message_text(fallback).strip()
                 normalized_answer = _normalize_answer_text(raw_answer)
+                normalized_answer = _downgrade_answer_when_example_missing(normalized_answer, message, docs)
+                normalized_answer = _enforce_confidence_gate_for_code(normalized_answer, message, docs_with_score)
+                normalized_answer = _ensure_source_citations(normalized_answer, docs)
                 if not normalized_answer:
                     normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
                 answer_blocks = _build_answer_blocks(normalized_answer)
@@ -188,6 +254,9 @@ class ChatService:
                         yield {"content": tail_piece}
 
                 normalized_answer = _normalize_answer_text(raw_answer)
+                normalized_answer = _downgrade_answer_when_example_missing(normalized_answer, message, docs)
+                normalized_answer = _enforce_confidence_gate_for_code(normalized_answer, message, docs_with_score)
+                normalized_answer = _ensure_source_citations(normalized_answer, docs)
                 if not normalized_answer:
                     normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
                 answer_blocks = _build_answer_blocks(normalized_answer)
@@ -210,7 +279,8 @@ class ChatService:
     def query(self, message: str) -> Dict[str, Any]:
         """无记忆的单次问答"""
         try:
-            docs = self._rag.retrieve(message, k=4)
+            docs_with_score = self._rag.retrieve_with_score(message, k=4)
+            docs = [doc for doc, _ in docs_with_score]
             if not docs:
                 return {
                     "success": True,
@@ -219,6 +289,9 @@ class ChatService:
                     "sources": [],
                 }
             answer = _normalize_answer_text(self._rag.generate(message, docs))
+            answer = _downgrade_answer_when_example_missing(answer, message, docs)
+            answer = _enforce_confidence_gate_for_code(answer, message, docs_with_score)
+            answer = _ensure_source_citations(answer, docs)
             blocks = _build_answer_blocks(answer)
             sources = _extract_sources(docs)
             return {"success": True, "response": answer, "blocks": blocks, "sources": sources}
@@ -239,9 +312,16 @@ class ChatService:
     # ------------------------------------------------------------------
     def _build_messages(self, message: str, docs: list, session_id: str) -> list:
         """构建 LLM 消息列表：system + context + history + user"""
-        context = "\n\n".join(doc.page_content for doc in docs)
+        context = format_context_docs(docs)
+        guardrail = ""
+        if is_usage_query(message) and not has_example_source(docs):
+            guardrail = (
+                "\n补充约束：当前检索上下文没有命中 demo/example/test/快速开始等示例来源。"
+                "不要输出未被示例验证的 API 写法；若示例未覆盖，请明确说明。"
+            )
 
         system_content = f"""{SYSTEM_PROMPT}
+{guardrail}
 
 请基于以下文档内容回答用户问题：
 
@@ -395,6 +475,29 @@ def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool 
             "说明：`Runtime` 不是单例，没有 `Runtime::getInstance()`，请使用 `galay::kernel::Runtime runtime;`。"
         )
 
+    http_server_fixed, http_server_rewritten = _rewrite_http_server_usage(fixed)
+    if http_server_rewritten:
+        fixed = http_server_fixed
+        changed = True
+        notes.append(
+            "说明：`HttpServer` 示例已按文档 API 纠正为 `HttpServerConfig + HttpRouter + "
+            "server.start(std::move(router))`。"
+        )
+
+    rpc_server_fixed, rpc_server_rewritten = _rewrite_rpc_server_usage(fixed)
+    if rpc_server_rewritten:
+        fixed = rpc_server_fixed
+        changed = True
+        notes.append("说明：`RpcServer` 示例已按文档 API 纠正为 `RpcServerConfig + RpcServer(config) + server.start()`。")
+
+    scheduler_client_fixed, scheduler_client_rewritten = _rewrite_scheduler_client_constructors(fixed)
+    if scheduler_client_rewritten:
+        fixed = scheduler_client_fixed
+        changed = True
+        notes.append(
+            "说明：`Redis/MySQL/Mongo/Etcd` 异步客户端示例已对齐为 `...Client(scheduler)` 构造。"
+        )
+
     http_fixed, http_dependency_rewritten = _ensure_http_dependency_steps(fixed)
     if http_dependency_rewritten:
         fixed = http_fixed
@@ -499,6 +602,180 @@ def _rewrite_runtime_singleton_usage(text: str) -> tuple[str, bool]:
     for name in rewritten_names:
         fixed = fixed.replace(f"{name}->", f"{name}.")
 
+    return fixed, fixed != before
+
+
+def _rewrite_http_server_usage(text: str) -> tuple[str, bool]:
+    if "HttpServer" not in text:
+        return text, False
+
+    fixed = text
+    before = fixed
+    router_required = False
+
+    def _rewrite_decl(match: re.Match[str]) -> str:
+        nonlocal router_required
+        indent = match.group("indent")
+        name = match.group("name")
+        args = (match.group("args") or "").strip()
+
+        if not args:
+            router_required = True
+            return f"{indent}HttpServerConfig config;\n{indent}HttpServer {name}(config);"
+
+        lowered_args = args.lower()
+        has_scheduler_token = any(token in lowered_args for token in _HTTP_SERVER_SCHEDULER_ARG_TOKENS)
+        has_multiple_args = "," in args
+        if has_scheduler_token or has_multiple_args:
+            router_required = True
+            return f"{indent}HttpServerConfig config;\n{indent}HttpServer {name}(config);"
+
+        return match.group(0)
+
+    fixed = _HTTP_SERVER_DECL_RE.sub(_rewrite_decl, fixed)
+
+    server_names = set(
+        re.findall(
+            r"(?m)^\s*HttpServer\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*;\s*$",
+            fixed,
+        )
+    )
+    if not server_names:
+        return fixed, fixed != before
+
+    def _rewrite_start(match: re.Match[str]) -> str:
+        nonlocal router_required
+        indent = match.group("indent")
+        name = match.group("name")
+        arg = (match.group("arg") or "").strip()
+        if name not in server_names:
+            return match.group(0)
+        if arg == "std::move(router)":
+            return match.group(0)
+        router_required = True
+        return f"{indent}{name}.start(std::move(router));"
+
+    fixed = _HTTP_SERVER_START_CALL_RE.sub(_rewrite_start, fixed)
+
+    def _rewrite_route(match: re.Match[str]) -> str:
+        nonlocal router_required
+        indent = match.group("indent")
+        name = match.group("name")
+        method = (match.group("method") or "").strip().lower()
+        args = (match.group("args") or "").strip()
+
+        if name not in server_names:
+            return match.group(0)
+
+        http_method = _HTTP_METHOD_MAP.get(method)
+        if not http_method:
+            return match.group(0)
+
+        router_required = True
+        return f"{indent}router.addHandler<HttpMethod::{http_method}>({args});"
+
+    fixed = _HTTP_SERVER_ROUTE_CALL_RE.sub(_rewrite_route, fixed)
+
+    if router_required and not _HTTP_ROUTER_DECL_RE.search(fixed):
+        fixed, inserted = _insert_http_router_decl(fixed)
+        if not inserted:
+            fixed = f"HttpRouter router;\n{fixed}"
+
+    return fixed, fixed != before
+
+
+def _insert_http_router_decl(text: str) -> tuple[str, bool]:
+    config_decl = re.search(
+        r"(?m)^(?P<indent>\s*)HttpServerConfig\s+[A-Za-z_]\w*\s*;\s*$",
+        text,
+    )
+    if config_decl:
+        indent = config_decl.group("indent")
+        insertion = f"{indent}HttpRouter router;\n"
+        return text[: config_decl.start()] + insertion + text[config_decl.start() :], True
+
+    server_decl = re.search(
+        r"(?m)^(?P<indent>\s*)HttpServer\s+[A-Za-z_]\w*\s*\([^;]*\)\s*;\s*$",
+        text,
+    )
+    if server_decl:
+        indent = server_decl.group("indent")
+        insertion = f"{indent}HttpRouter router;\n"
+        return text[: server_decl.start()] + insertion + text[server_decl.start() :], True
+
+    return text, False
+
+
+def _rewrite_rpc_server_usage(text: str) -> tuple[str, bool]:
+    if "RpcServer" not in text:
+        return text, False
+
+    fixed = text
+    before = fixed
+
+    def _rewrite_decl(match: re.Match[str]) -> str:
+        indent = match.group("indent")
+        name = match.group("name")
+        args = (match.group("args") or "").strip()
+        if args == "config":
+            return match.group(0)
+        return f"{indent}RpcServerConfig config;\n{indent}RpcServer {name}(config);"
+
+    fixed = _RPC_SERVER_DECL_RE.sub(_rewrite_decl, fixed)
+
+    server_names = set(
+        re.findall(
+            r"(?m)^\s*RpcServer\s+([A-Za-z_]\w*)\s*\([^;]*\)\s*;\s*$",
+            fixed,
+        )
+    )
+    if not server_names:
+        return fixed, fixed != before
+
+    def _rewrite_start(match: re.Match[str]) -> str:
+        name = match.group("name")
+        indent = match.group("indent")
+        arg = (match.group("arg") or "").strip()
+        if name not in server_names:
+            return match.group(0)
+        if not arg:
+            return match.group(0)
+        return f"{indent}{name}.start();"
+
+    fixed = _RPC_SERVER_START_CALL_RE.sub(_rewrite_start, fixed)
+
+    if "RpcServer" in fixed and not _RPC_SERVER_CONFIG_DECL_RE.search(fixed):
+        server_decl = re.search(
+            r"(?m)^(?P<indent>\s*)RpcServer\s+[A-Za-z_]\w*\s*\([^;]*\)\s*;\s*$",
+            fixed,
+        )
+        if server_decl:
+            indent = server_decl.group("indent")
+            insertion = f"{indent}RpcServerConfig config;\n"
+            fixed = fixed[: server_decl.start()] + insertion + fixed[server_decl.start() :]
+
+    return fixed, fixed != before
+
+
+def _rewrite_scheduler_client_constructors(text: str) -> tuple[str, bool]:
+    if "scheduler" not in text:
+        return text, False
+
+    fixed = text
+    before = fixed
+
+    def _rewrite_decl(match: re.Match[str]) -> str:
+        indent = match.group("indent")
+        ctype = match.group("type")
+        name = match.group("name")
+        if name.startswith("m_"):
+            return match.group(0)
+        # 避免误改类成员声明，优先改常见局部变量名。
+        if name not in {"client", "session", "sub", "pub", "redis", "mysql", "mongo", "etcd"}:
+            return match.group(0)
+        return f"{indent}{ctype} {name}(scheduler);"
+
+    fixed = _SCHEDULER_CLIENT_DEFAULT_CTOR_RE.sub(_rewrite_decl, fixed)
     return fixed, fixed != before
 
 
@@ -761,6 +1038,125 @@ def _build_stream_preview(streamed_parts: List[str]) -> tuple[str, List[Dict[str
     if not preview_text:
         return "", []
     return preview_text, _build_answer_blocks(preview_text)
+
+
+def _compute_evidence_confidence(docs_with_score: list) -> float:
+    if not docs_with_score:
+        return 0.0
+
+    scores: List[float] = []
+    for item in docs_with_score:
+        if not isinstance(item, tuple) or len(item) < 2:
+            continue
+        try:
+            score = float(item[1])
+        except (TypeError, ValueError):
+            continue
+        if score < 0.0:
+            score = 0.0
+        if score > 1.0:
+            score = 1.0
+        scores.append(score)
+
+    if not scores:
+        return 0.0
+
+    top = scores[0]
+    avg_top = sum(scores[:3]) / min(len(scores), 3)
+    confidence = top * 0.7 + avg_top * 0.3
+    if confidence < 0.0:
+        return 0.0
+    if confidence > 1.0:
+        return 1.0
+    return confidence
+
+
+def _enforce_confidence_gate_for_code(answer: str, message: str, docs_with_score: list) -> str:
+    if not answer:
+        return answer
+    if not is_usage_query(message):
+        return answer
+
+    confidence = _compute_evidence_confidence(docs_with_score)
+    if confidence >= USAGE_CODE_MIN_CONFIDENCE:
+        return answer
+
+    stripped = _FENCED_CODE_BLOCK_RE.sub("", answer).strip()
+    if not stripped:
+        stripped = "结论：当前证据不足，暂不提供代码示例。"
+    note = (
+        f"说明：当前证据置信度 {confidence:.2f} 低于阈值 {USAGE_CODE_MIN_CONFIDENCE:.2f}，"
+        "为避免误导，已省略代码块。请补充更具体的问题或指定仓库/模块。"
+    )
+    if note not in stripped:
+        stripped = f"{stripped.rstrip()}\n\n{note}"
+    return stripped
+
+
+def _ensure_source_citations(answer: str, docs: list) -> str:
+    if not answer:
+        return answer
+    if not docs:
+        return answer
+    if "参考来源" in answer:
+        return answer
+
+    refs: List[tuple[str, str]] = []
+    seen: set[str] = set()
+    for doc in docs:
+        meta = getattr(doc, "metadata", {}) or {}
+        source = str(meta.get("source", "")).strip()
+        if not source:
+            continue
+        project = str(meta.get("project", "unknown")).strip() or "unknown"
+        key = f"{project}:{source}"
+        if key in seen:
+            continue
+        seen.add(key)
+        refs.append((project, source))
+
+    if not refs:
+        return answer
+
+    lower_answer = answer.lower()
+    has_inline_ref = False
+    for _, source in refs:
+        source_lc = source.lower()
+        source_name_lc = Path(source).name.lower()
+        if source_lc in lower_answer or source_name_lc in lower_answer:
+            has_inline_ref = True
+            break
+
+    if has_inline_ref:
+        return answer
+
+    lines = [f"{idx}. `{project}/{source}`" for idx, (project, source) in enumerate(refs[:6], start=1)]
+    appendix = "参考来源：\n" + "\n".join(lines)
+    return f"{answer.rstrip()}\n\n{appendix}"
+
+
+def _downgrade_answer_when_example_missing(answer: str, message: str, docs: list) -> str:
+    if not answer:
+        return answer
+    if not is_usage_query(message):
+        return answer
+    if has_example_source(docs):
+        return answer
+
+    stripped = _FENCED_CODE_BLOCK_RE.sub("", answer).strip()
+    if not stripped:
+        stripped = (
+            "结论：当前检索上下文未命中 demo/example/test/快速开始来源，无法安全给出可执行示例代码。\n\n"
+            "1. 我可以先按仓库与模块补齐示例来源后再生成代码。\n"
+            "2. 在此之前仅建议参考对应项目的 README 与 API 文档流程。"
+        )
+    note = (
+        "说明：为避免无依据代码示例，已省略代码块；请补充具体仓库（如 `galay-http`）"
+        "或确认允许仅按 API 文档回答。"
+    )
+    if note not in stripped:
+        stripped = f"{stripped.rstrip()}\n\n{note}"
+    return stripped
 
 
 def _strip_decorative_symbols(text: str) -> str:

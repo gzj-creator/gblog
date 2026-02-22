@@ -121,13 +121,14 @@ class ChatApp {
             const codeIndex = codeBlocks.length;
             const firstCodeLine = String(code || '').split('\n')[0] || '';
             const guessedLang = this._guessCodeLanguage(firstCodeLine);
-            const normalizedLang = (lang || guessedLang || 'text').trim().toLowerCase();
+            const explicitLang = String(lang || '').trim().toLowerCase();
+            const normalizedLang = (explicitLang || guessedLang || 'text').trim().toLowerCase();
             const safeLang = normalizedLang ? ` class="language-${this.escapeHtml(normalizedLang)}"` : '';
             const displayCode = this._normalizeCodeForDisplay((code || '').replace(/\n$/, ''), normalizedLang);
             if (!displayCode.trim()) {
                 return `${prefix}\n`;
             }
-            if (!this._isLikelyCodeContent(displayCode, normalizedLang)) {
+            if (!explicitLang && !this._isLikelyCodeContent(displayCode, normalizedLang)) {
                 return `${prefix}\n${displayCode}\n`;
             }
             const safeCode = this._highlightCode(displayCode, normalizedLang);
@@ -143,6 +144,7 @@ class ChatApp {
         let paragraphLines = [];
         let blockquoteLines = [];
         let activeList = '';
+        let nextOrderedNumber = null;
 
         const flushParagraph = () => {
             if (paragraphLines.length === 0) return;
@@ -161,6 +163,9 @@ class ChatApp {
         const closeList = () => {
             if (!activeList) return;
             htmlParts.push(`</${activeList}>`);
+            if (activeList === 'ol') {
+                nextOrderedNumber = null;
+            }
             activeList = '';
         };
 
@@ -212,16 +217,20 @@ class ChatApp {
                 continue;
             }
 
-            const olMatch = trimmed.match(/^[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]?\s*\d+\.\s+(.+)$/u);
+            const olMatch = trimmed.match(/^[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]?\s*(\d+)\.\s+(.+)$/u);
             if (olMatch) {
                 flushParagraph();
                 flushBlockquote();
-                if (activeList !== 'ol') {
+                const itemNumber = Number(olMatch[1]);
+                const isRepeatedOne = activeList === 'ol' && nextOrderedNumber !== null && nextOrderedNumber > 1 && itemNumber === 1;
+                const shouldOpenNewOl = activeList !== 'ol' || nextOrderedNumber === null || (!isRepeatedOne && itemNumber !== nextOrderedNumber);
+                if (shouldOpenNewOl) {
                     closeList();
-                    htmlParts.push('<ol>');
+                    htmlParts.push(itemNumber > 1 ? `<ol start="${itemNumber}">` : '<ol>');
                     activeList = 'ol';
                 }
-                htmlParts.push(`<li>${this._formatInlineMarkdown(olMatch[1])}</li>`);
+                htmlParts.push(`<li>${this._formatInlineMarkdown(olMatch[2])}</li>`);
+                nextOrderedNumber = isRepeatedOne ? (nextOrderedNumber + 1) : (itemNumber + 1);
                 continue;
             }
 
@@ -252,45 +261,12 @@ class ChatApp {
 
     _normalizeMarkdownInput(text) {
         let normalized = String(text || '').replace(/\r\n?/g, '\n');
-        normalized = normalized.replace(/[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌🚀🎯✨💡]/gu, '');
-        // 修复行内 fence："...：```cpp" / "return 0;}```"。
-        normalized = normalized.replace(/([^\n])\s*[“”"']?\s*```([a-zA-Z0-9_-]*)/g, '$1\n```$2');
+        normalized = normalized.replace(/(^|\n)[“”"']*```([a-zA-Z0-9_-]*)[”"']*[ \t]*(?=\n|$)/g, '$1```$2');
         normalized = normalized.replace(/```([a-zA-Z0-9_-]+)\s+(?=\S)/g, '```$1\n');
         normalized = normalized.replace(/([^\n])```[”"']?(?=\s*(?:\n|$))/g, '$1\n```');
-        normalized = normalized.replace(/(^|\n)[“”"']+```([a-zA-Z0-9_-]*)\s*(?=\n|$)/g, '$1```$2');
-        normalized = normalized.replace(/(^|\n)```([a-zA-Z0-9_-]*)[”"']+\s*(?=\n|$)/g, '$1```$2');
-        normalized = normalized.replace(/([:：])\s*[“”"']\s*(?=\n```[a-zA-Z0-9_-]*\s*\n)/g, '$1');
-
-        // 修复模型把分隔线和标题粘在一起的场景：---### ...
-        normalized = normalized.replace(/([^\n])---(?=\s*#{1,6}\s)/g, '$1\n---\n');
-        normalized = normalized.replace(/---\s*(#{1,6}\s)/g, '---\n$1');
-        normalized = normalized.replace(/([^\n#])\s*(#{1,6}\s)/g, '$1\n$2');
-
-        // 常见的“句号后紧跟 Markdown 结构”补换行。
-        normalized = normalized.replace(/([。！？!?:：;；])\s*(#{1,6}\s)/g, '$1\n$2');
-        normalized = normalized.replace(/([。！？!?:：;；])\s*([-*]\s)/g, '$1\n$2');
-        normalized = normalized.replace(/([。！？!?:：;；])\s*(\d+\.\s)/g, '$1\n$2');
-        normalized = normalized.replace(/([。！？!?:：;；])\s*([1-9]\d?)\.(?=[^\d\s])/g, '$1\n$2. ');
-        // 修复 "2.模块化..." 这种缺少空格的编号项。
-        normalized = normalized.replace(/(^|\n)([1-9]\d?)\.(?=[^\d\s])/g, '$1$2. ');
-        // 修复编号项直接粘在中文文本后面: "...需求2.模块化..."
-        normalized = normalized.replace(/([一-龥）)])([1-9]\d?)\.(?=[^\d\s])/gu, '$1\n$2. ');
-        // 修复编号项粘连在前一句末尾: "...需求2. 模块化..."
-        normalized = normalized.replace(/([^\n])([1-9]\d?\.\s+(?=[^\d]))/g, '$1\n$2');
-        normalized = normalized.replace(/([。！？!?:：;；])\s*([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
-        normalized = normalized.replace(/([^#\n])\s+([✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]\s*\d+\.\s)/gu, '$1\n$2');
-
-        // 把行内“列表分隔符”尽量拆成独立列表行。
-        normalized = normalized.replace(/([。；;:：）)])\s*-\s+/g, '$1\n- ');
-        normalized = normalized.replace(/([一-龥])-\s+/gu, '$1\n- ');
-
-        // 修复 `###` 被错误断成单独一行的情况。
-        normalized = normalized.replace(/(^|\n)(#{1,6})\s*\n(?=\S)/g, '$1$2 ');
-
-        // 识别被模型打平的代码段并补全 fenced code block。
-        normalized = this._recoverLooseCodeFences(normalized);
-
-        return normalized;
+        normalized = normalized.replace(/([^\n])\s*[“”"']?\s*```([a-zA-Z0-9_-]*)/g, '$1\n```$2');
+        normalized = normalized.replace(/\n{3,}/g, '\n\n');
+        return normalized.trim();
     }
 
     _recoverLooseCodeFences(text) {
@@ -417,13 +393,14 @@ class ChatApp {
     }
 
     _detectInlineCodeStartIndex(text) {
+        const hasChinese = /[\u4e00-\u9fa5]/u.test(text);
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return -1;
         if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return -1;
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return -1;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|cd|ls|pwd|echo|export|sudo|apt(?:-get)?|brew|dnf|yum|nc|telnet|g\+\+|gcc|clang\+\+|clang)\b/i.test(text) && !hasChinese) return -1;
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return -1;
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]?\s*$/.test(text)) return -1;
 
-        const commandPattern = /\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i;
+        const commandPattern = /\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|cd|ls|pwd|echo|export|sudo|apt(?:-get)?|brew|dnf|yum|nc|telnet|g\+\+|gcc|clang\+\+|clang)\b/i;
         const patterns = [
             /(?:cpp|c\+\+)?\s*#include\s*</i,
             /\bint\s+main\s*\(/,
@@ -437,6 +414,7 @@ class ChatApp {
             if (!match) continue;
             if (match.index <= 0) continue;
             if (pattern === commandPattern) {
+                if (hasChinese) continue;
                 const tail = text.slice(match.index + match[0].length);
                 if (!/^\s+[$A-Za-z0-9_./:@=-]/.test(tail)) {
                     continue;
@@ -456,7 +434,7 @@ class ChatApp {
 
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text)) return true;
         if (/^(?:template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)/.test(text)) return true;
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return true;
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|cd|ls|pwd|echo|export|sudo|apt(?:-get)?|brew|dnf|yum|nc|telnet|g\+\+|gcc|clang\+\+|clang)\b/i.test(text) && !hasChinese) return true;
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return true;
         if (/^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$/.test(text)) return true;
         if (/\bco_(?:return|await|yield)\b/.test(text) && !hasChinese) return true;
@@ -475,7 +453,7 @@ class ChatApp {
         if (!text) return 'text';
         if (/^(?:cpp|c\+\+)?\s*#include\s*</i.test(text) || /\bint\s+main\s*\(/.test(text)) return 'cpp';
         if (/^(?:cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(/i.test(text)) return 'cmake';
-        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b/i.test(text)) return 'bash';
+        if (/^\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|cd|ls|pwd|echo|export|sudo|apt(?:-get)?|brew|dnf|yum|nc|telnet|g\+\+|gcc|clang\+\+|clang)\b/i.test(text) && !/[\u4e00-\u9fa5]/u.test(text)) return 'bash';
         return 'text';
     }
 
@@ -588,7 +566,8 @@ class ChatApp {
         if (['bash', 'sh', 'zsh'].includes(lang)) {
             const lines = text.split('\n');
             const hasCommandLikeLine = lines.some((line) => {
-                const match = line.match(/^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b([^\n]*)$/i);
+                if (/[\u4e00-\u9fa5]/u.test(line)) return false;
+                const match = line.match(/^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|cd|ls|pwd|echo|export|sudo|apt(?:-get)?|brew|dnf|yum|nc|telnet|g\+\+|gcc|clang\+\+|clang)\b([^\n]*)$/i);
                 if (!match) return false;
                 const tail = String(match[2] || '');
                 if (!tail.trim()) return true;
@@ -815,7 +794,7 @@ class ChatApp {
             return `${prefix}<span class="code-token-comment">${comment}</span>`;
         });
 
-        html = html.replace(/\b(if|then|fi|for|in|do|done|while|case|esac|function|local|export|set|cd|echo|cat|grep|sed|awk|curl|wget|git|docker|kubectl|cmake|make|mkdir|ls|nc|telnet|python|python3|pip|npm|pnpm|yarn)\b/g, '<span class="code-token-keyword">$1</span>');
+        html = html.replace(/\b(if|then|fi|for|in|do|done|while|case|esac|function|local|export|set|cd|echo|cat|grep|sed|awk|curl|wget|git|docker|kubectl|cmake|make|mkdir|ls|pwd|sudo|apt|apt-get|brew|dnf|yum|nc|telnet|python|python3|pip|npm|pnpm|yarn|g\+\+|gcc|clang\+\+|clang)\b/g, '<span class="code-token-keyword">$1</span>');
         html = html.replace(/(\$[A-Za-z_][A-Za-z0-9_]*|\$\{[^}]+\})/g, '<span class="code-token-number">$1</span>');
 
         html = html.replace(/@@BASH_TOKEN_(\d+)@@/g, (_m, idx) => placeholders[Number(idx)] || '');
@@ -1035,6 +1014,13 @@ class ChatApp {
 
             try {
                 const data = JSON.parse(payload);
+                const replaceText = this._coerceText(data.replace);
+                if (replaceText) {
+                    fullText = replaceText;
+                    contentDiv.innerHTML = this.formatMessage(fullText);
+                    this.scrollToBottom();
+                    onTextUpdate(fullText);
+                }
                 const chunkText = this._coerceText(data.content);
                 if (chunkText) {
                     fullText += chunkText;

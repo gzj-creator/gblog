@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.core.markdown_normalizer import normalize_markdown_content
 from src.core.vector_store import VectorStoreManager
 from src.services.rag_service import RAGService, SYSTEM_PROMPT
 from src.utils.exceptions import ChatServiceError
@@ -72,6 +73,7 @@ class ChatService:
             messages = self._build_messages(message, docs, session_id)
 
             raw_answer_parts: List[str] = []
+            streamed_parts: List[str] = []
             stream_buffer = ""
             emitted_any = False
 
@@ -85,6 +87,7 @@ class ChatService:
                         if not emit_piece:
                             break
                         emitted_any = True
+                        streamed_parts.append(emit_piece)
                         yield {"content": emit_piece}
 
             raw_answer = "".join(raw_answer_parts)
@@ -112,6 +115,11 @@ class ChatService:
                 if not emitted_any:
                     for block in _split_answer_blocks(normalized_answer):
                         yield {"content": block}
+                else:
+                    streamed_text = "".join(streamed_parts).strip()
+                    if streamed_text != normalized_answer.strip():
+                        # 统一规则最终落地：以规范化后的全文覆盖流式中间态。
+                        yield {"replace": normalized_answer}
                 answer = normalized_answer
 
             self._append_history(session_id, message, answer)
@@ -253,138 +261,11 @@ def _coerce_text(value: Any) -> str:
 
 
 def _normalize_answer_text(raw: str) -> str:
-    """清洗模型输出中的装饰符号，并重排为结构化分块文本。"""
+    """统一规范模型输出，保证与入库文档一致的 markdown 规则。"""
     if not raw:
         return ""
 
-    text = str(raw).replace("\r\n", "\n").replace("\r", "\n")
-    text = _strip_decorative_symbols(text)
-    text = _insert_structural_breaks(text)
-    text = re.sub(r"(?i)\bcpp\s*(?=#include\b)", "", text)
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"[ \t]*\n[ \t]*", "\n", text).strip()
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    if not text:
-        return ""
-
-    blocks: List[str] = []
-    paragraph_lines: List[str] = []
-    code_lines: List[str] = []
-    in_code_block = False
-    synthetic_code_block = False
-    pending_language_hint = ""
-
-    def flush_paragraph() -> None:
-        if paragraph_lines:
-            blocks.append(" ".join(paragraph_lines).strip())
-            paragraph_lines.clear()
-
-    def flush_code() -> None:
-        if code_lines:
-            blocks.append("\n".join(code_lines).strip())
-            code_lines.clear()
-
-    for raw_line in text.split("\n"):
-        line = raw_line.rstrip()
-        stripped = line.strip()
-        fence_candidate = re.sub(r"^[“”\"']+|[“”\"']+$", "", stripped)
-
-        if fence_candidate.startswith("```"):
-            if in_code_block:
-                if re.match(r"^```\s*$", fence_candidate):
-                    code_lines.append("```")
-                    flush_code()
-                    in_code_block = False
-                    synthetic_code_block = False
-                else:
-                    # fence 内出现 ```cpp 这类脏行时，不提前结束 code block。
-                    nested_hint = re.sub(r"^```", "", fence_candidate).strip()
-                    if nested_hint:
-                        code_lines.append(nested_hint)
-            else:
-                flush_paragraph()
-                in_code_block = True
-                synthetic_code_block = False
-                pending_language_hint = ""
-                if re.match(r"^```[A-Za-z0-9_-]+\s*$", fence_candidate):
-                    code_lines = [fence_candidate]
-                else:
-                    code_lines = ["```"]
-            continue
-
-        if in_code_block and not synthetic_code_block:
-            code_lines.append(line)
-            continue
-
-        if in_code_block and synthetic_code_block:
-            if not stripped or _looks_like_code_line(stripped):
-                if stripped:
-                    code_lines.append(_normalize_code_hint_line(stripped))
-                else:
-                    code_lines.append("")
-                continue
-
-            code_lines.append("```")
-            flush_code()
-            in_code_block = False
-            synthetic_code_block = False
-
-        if _is_language_hint(stripped):
-            pending_language_hint = _normalize_language_hint(stripped)
-            continue
-
-        inline_code_start = _find_inline_code_start(stripped)
-        if inline_code_start > 0:
-            plain_text = stripped[:inline_code_start].strip()
-            candidate_code = stripped[inline_code_start:].strip()
-            if plain_text:
-                paragraph_lines.append(plain_text)
-                flush_paragraph()
-            stripped = candidate_code
-
-        if not stripped:
-            flush_paragraph()
-            pending_language_hint = ""
-            continue
-
-        if _looks_like_code_line(stripped):
-            flush_paragraph()
-            in_code_block = True
-            synthetic_code_block = True
-            code_lang = pending_language_hint or _guess_code_language(stripped)
-            pending_language_hint = ""
-            code_lines = [f"```{code_lang}", _normalize_code_hint_line(stripped)]
-            continue
-
-        is_header = re.match(r"^#{1,6}\s+\S", stripped) is not None
-        is_ol = re.match(r"^\d+\.\s+\S", stripped) is not None
-        is_ul = re.match(r"^[-*]\s+\S", stripped) is not None
-        if is_ol or is_ul:
-            flush_paragraph()
-            blocks.append(stripped)
-            continue
-
-        if is_header:
-            flush_paragraph()
-            blocks.append(stripped)
-            pending_language_hint = ""
-            continue
-
-        pending_language_hint = ""
-        paragraph_lines.append(stripped)
-
-    if in_code_block:
-        if not code_lines or code_lines[-1] != "```":
-            code_lines.append("```")
-        flush_code()
-
-    flush_paragraph()
-    blocks = [block for block in blocks if block]
-    blocks = [
-        block for block in blocks
-        if not re.match(r"^```[A-Za-z0-9_-]*\n\s*```$", block.strip(), flags=re.DOTALL)
-    ]
-    return "\n\n".join(blocks).strip()
+    return normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
 
 
 def _strip_decorative_symbols(text: str) -> str:
@@ -395,170 +276,6 @@ def _strip_decorative_symbols(text: str) -> str:
     stripped = re.sub(decorative, "", text)
     stripped = re.sub(r"\s*---+\s*", "\n", stripped)
     return stripped
-
-
-def _insert_structural_breaks(text: str) -> str:
-    # 标题、编号、列表粘在同一行时，尽量拆成独立块。
-    normalized = text
-    # 修复行内 fence："...：```cpp" / "return 0;}```"。
-    normalized = re.sub(r"([^\n])\s*[“”\"']?\s*```([A-Za-z0-9_-]*)", r"\1\n```\2", normalized)
-    normalized = re.sub(r"```([A-Za-z0-9_-]+)\s+(?=\S)", r"```\1\n", normalized)
-    normalized = re.sub(r"([^\n])```[“”\"']?(?=\s*(?:\n|$))", r"\1\n```", normalized)
-    normalized = re.sub(r"(^|\n)[“”\"']+```([A-Za-z0-9_-]*)\s*(?=\n|$)", r"\1```\2", normalized)
-    normalized = re.sub(r"(^|\n)```([A-Za-z0-9_-]*)[“”\"']+\s*(?=\n|$)", r"\1```\2", normalized)
-    normalized = re.sub(r"([:：])\s*[“”\"']\s*(?=\n```[A-Za-z0-9_-]*\s*\n)", r"\1", normalized)
-    normalized = re.sub(r"([^\n#])\s*(#{1,6}\s)", r"\1\n\2", normalized)
-    normalized = re.sub(r"([。！？!?;；:：])\s*([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
-    # 修复 "2.模块化..." 这种缺少空格的编号项。
-    normalized = re.sub(r"(^|\n)([1-9]\d?)\.(?=[^\d\s])", r"\1\2. ", normalized)
-    # 修复编号项直接粘在中文文本后面: "...需求2.模块化..."
-    normalized = re.sub(r"([一-龥）)])([1-9]\d?)\.(?=[^\d\s])", r"\1\n\2. ", normalized)
-    # 修复编号项粘连在前一句末尾: "...需求2. 模块化..."
-    normalized = re.sub(r"([^\n])([1-9]\d?\.\s+(?=[^\d]))", r"\1\n\2", normalized)
-    normalized = re.sub(r"([^\n#])\s+(\d+\.\s)", r"\1\n\2", normalized)
-    normalized = re.sub(r"([。！？!?;；:：])\s*(\d+\.\s)", r"\1\n\2", normalized)
-    normalized = re.sub(r"([。！？!?;；:：])\s*([-*]\s)", r"\1\n\2", normalized)
-    normalized = re.sub(r"([一-龥A-Za-z0-9）)])-\s+", r"\1\n- ", normalized)
-    normalized = re.sub(r"(^|\n)(#{1,6})\s*\n(?=\S)", r"\1\2 ", normalized)
-    normalized = re.sub(r"([^\n])\s*((?:环境要求|安装步骤|最小示例|运行与验证)\s*[：:])", r"\1\n\2", normalized)
-    normalized = re.sub(r"(?m)^\s*(环境要求|安装步骤|最小示例|运行与验证)\s*[：:]\s*", r"## \1\n", normalized)
-    normalized = re.sub(r"([:：])\s*(?:cpp|c\+\+)?\s*(#include\s*<)", r"\1\ncpp \2", normalized, flags=re.IGNORECASE)
-    normalized = re.sub(r"([:：。；;])\s*(int\s+main\s*\()", r"\1\n\2", normalized)
-    normalized = re.sub(
-        r"([>;}])\s*(?=(?:#include|int\s+main\s*\(|template\s*<|class\s+\w+|struct\s+\w+))",
-        r"\1\n",
-        normalized,
-        flags=re.IGNORECASE,
-    )
-    normalized = re.sub(
-        r"([:：。；;])\s*(\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b)",
-        r"\1\n\2",
-        normalized,
-        flags=re.IGNORECASE,
-    )
-    return normalized
-
-
-def _looks_like_code_line(line: str) -> bool:
-    stripped = line.strip()
-    if not stripped:
-        return False
-
-    has_cn = re.search(r"[一-龥]", stripped) is not None
-
-    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", stripped, flags=re.IGNORECASE):
-        return True
-    if re.search(r"^\s*(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", stripped):
-        return True
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", stripped, flags=re.IGNORECASE):
-        return True
-    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
-        return True
-    if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]\s*$", stripped):
-        return True
-    if re.search(r"\bco_(return|await|yield)\b", stripped) and not has_cn:
-        return True
-    if re.search(r"^\s*return\b[^一-龥]*[;}]\s*$", stripped) and not has_cn:
-        return True
-    if re.search(r"->\s*\w+\(", stripped) and not has_cn:
-        return True
-    if re.search(r"^[{}]+[;,]?$", stripped):
-        return True
-    if re.search(r"^[)\]}]+[;,]?$", stripped):
-        return True
-    if stripped.endswith(";") and not has_cn and len(stripped) >= 12:
-        return True
-    if re.search(r"[{}]", stripped) and re.search(r"\(", stripped) and not has_cn:
-        return True
-
-    return False
-
-
-def _is_language_hint(line: str) -> bool:
-    return bool(_normalize_language_hint(line))
-
-
-def _normalize_language_hint(line: str) -> str:
-    stripped = (line or "").strip().lower()
-    stripped = re.sub(r"^\s*[-*+]\s*", "", stripped)
-    stripped = re.sub(r"^`+|`+$", "", stripped)
-    stripped = re.sub(r"[：:]\s*$", "", stripped)
-    stripped = re.sub(r"^language\s*[：:]\s*", "", stripped)
-    stripped = stripped.strip()
-    if stripped in {"cpp", "c++", "cc", "cxx", "hpp", "h"}:
-        return "cpp"
-    if stripped in {"bash", "shell", "sh", "zsh"}:
-        return "bash"
-    if stripped == "cmake":
-        return "cmake"
-    if stripped in {"text", "plaintext"}:
-        return "text"
-    return ""
-
-
-def _normalize_code_hint_line(line: str) -> str:
-    cleaned = re.sub(r"^(?:cpp|c\+\+)\s*(?=#include\b)", "", line, flags=re.IGNORECASE)
-    cleaned = re.sub(
-        r"^(?:bash|shell)\s*(?=\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b)",
-        "",
-        cleaned,
-        flags=re.IGNORECASE,
-    )
-    return cleaned
-
-
-def _find_inline_code_start(line: str) -> int:
-    if not line:
-        return -1
-
-    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", line, flags=re.IGNORECASE):
-        return -1
-    if re.search(r"^(template\s*<|class\s+\w+|struct\s+\w+|namespace\s+\w+)", line):
-        return -1
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", line, flags=re.IGNORECASE):
-        return -1
-    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", line, flags=re.IGNORECASE):
-        return -1
-    if re.search(r"^\s*(int|void|bool|auto|size_t)\s+\w+.*[;{]?\s*$", line):
-        return -1
-
-    patterns = (
-        r"(?:cpp|c\+\+)?\s*#include\s*<",
-        r"\bint\s+main\s*\(",
-        r"\bcmake_minimum_required\s*\(",
-        r"\bproject\s*\(",
-        r"\$?\s*(?:git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b",
-    )
-
-    starts: List[int] = []
-    for pattern in patterns:
-        match = re.search(pattern, line, flags=re.IGNORECASE)
-        if not match:
-            continue
-        if match.start() <= 0:
-            continue
-        if pattern.startswith(r"\$?"):
-            tail = line[match.end():]
-            if not re.match(r"^\s+[$A-Za-z0-9_./:@=-]", tail):
-                continue
-        starts.append(match.start())
-
-    return min(starts) if starts else -1
-
-
-def _guess_code_language(line: str) -> str:
-    stripped = (line or "").strip()
-    if not stripped:
-        return "text"
-
-    if re.search(r"^(?:cpp|c\+\+)?\s*#include\s*<", stripped, flags=re.IGNORECASE) or re.search(r"\bint\s+main\s*\(", stripped):
-        return "cpp"
-    if re.search(r"^(cmake_minimum_required|project|add_executable|add_library|target_link_libraries)\s*\(", stripped, flags=re.IGNORECASE):
-        return "cmake"
-    if re.search(r"^\$?\s*(git|docker|kubectl|curl|wget|npm|pnpm|yarn|pip|python3?|cmake|make|mkdir|ls|nc|telnet)\b", stripped, flags=re.IGNORECASE):
-        return "bash"
-
-    return "text"
 
 
 def _split_answer_blocks(answer: str) -> List[str]:

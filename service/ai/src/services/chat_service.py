@@ -49,6 +49,45 @@ _RUNTIME_SINGLETON_PTR_ASSIGN_RE = re.compile(
 _RUNTIME_SINGLETON_CALL_RE = re.compile(
     r"(?:galay::kernel::)?Runtime::getInstance\(\s*\)"
 )
+_HTTP_KERNEL_CLONE_LINE_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)git\s+clone\s+https://github\.com/gzj-creator/galay-kernel\.git\s*$"
+)
+_HTTP_UTILS_CLONE_LINE_RE = re.compile(
+    r"(?m)^\s*git\s+clone\s+https://github\.com/gzj-creator/galay-utils\.git\s*$"
+)
+_HTTP_HTTP_CLONE_LINE_RE = re.compile(
+    r"(?m)^(?P<indent>\s*)git\s+clone\s+https://github\.com/gzj-creator/galay-http\.git\s*$"
+)
+_CPP_FENCE_BLOCK_RE = re.compile(
+    r"(?ms)(?P<open>```(?P<lang>[A-Za-z0-9_+\-]*)\s*\n)(?P<code>.*?)(?P<close>\n```)"
+)
+_CPP_INCLUDE_LINE_RE = re.compile(r'^\s*#\s*include\s*[<"](?P<header>[^>"]+)[>"]\s*$')
+_CPP_IMPORT_LINE_RE = re.compile(r'^\s*import\s+(?P<module>[A-Za-z_][A-Za-z0-9_.]*)\s*;\s*$')
+_CPP_LANGS = {"cpp", "c++", "cc", "cxx", "hpp", "h"}
+_GALAY_INCLUDE_PREFIX_TO_MODULE = (
+    ("galay-kernel/", "galay.kernel"),
+    ("galay-ssl/", "galay.ssl"),
+    ("galay-http/", "galay.http"),
+    ("galay-rpc/", "galay.rpc"),
+    ("galay-redis/", "galay.redis"),
+    ("galay-mysql/", "galay.mysql"),
+    ("galay-mongo/", "galay.mongo"),
+    ("galay-etcd/", "galay.etcd"),
+    ("galay-utils/", "galay.utils"),
+    ("galay-mcp/", "galay.mcp"),
+)
+_GALAY_MODULE_TO_INCLUDE = {
+    "galay.kernel": '#include "galay-kernel/kernel/Runtime.h"',
+    "galay.ssl": '#include "galay-ssl/async/SslSocket.h"',
+    "galay.http": '#include "galay-http/kernel/http/HttpServer.h"',
+    "galay.rpc": '#include "galay-rpc/kernel/RpcServer.h"',
+    "galay.redis": '#include "galay-redis/async/RedisClient.h"',
+    "galay.mysql": '#include "galay-mysql/async/AsyncMysqlClient.h"',
+    "galay.mongo": '#include "galay-mongo/async/AsyncMongoClient.h"',
+    "galay.etcd": '#include "galay-etcd/async/AsyncEtcdClient.h"',
+    "galay.utils": '#include <galay-utils/galay-utils.hpp>',
+    "galay.mcp": '#include "galay-mcp/server/McpStdioServer.h"',
+}
 
 
 class ChatService:
@@ -301,16 +340,16 @@ def _coerce_text(value: Any) -> str:
     return str(value)
 
 
-def _normalize_answer_text(raw: str) -> str:
+def _normalize_answer_text(raw: str, *, finalize_examples: bool = True) -> str:
     """统一规范模型输出，保证与入库文档一致的 markdown 规则。"""
     if not raw:
         return ""
 
     normalized = normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
-    return _enforce_framework_output_consistency(normalized)
+    return _enforce_framework_output_consistency(normalized, finalize_examples=finalize_examples)
 
 
-def _enforce_framework_output_consistency(text: str) -> str:
+def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool = True) -> str:
     if not text:
         return ""
 
@@ -355,6 +394,29 @@ def _enforce_framework_output_consistency(text: str) -> str:
         notes.append(
             "说明：`Runtime` 不是单例，没有 `Runtime::getInstance()`，请使用 `galay::kernel::Runtime runtime;`。"
         )
+
+    http_fixed, http_dependency_rewritten = _ensure_http_dependency_steps(fixed)
+    if http_dependency_rewritten:
+        fixed = http_fixed
+        changed = True
+        notes.append(
+            "说明：`galay-http` 的安装依赖包含 `galay-utils`，拉取源码时请同时 clone。"
+        )
+
+    if finalize_examples:
+        dual_mode_fixed, dual_mode_rewritten = _ensure_dual_cpp_example_modes(fixed)
+        if dual_mode_rewritten:
+            fixed = dual_mode_fixed
+            changed = True
+            notes.append(
+                "说明：代码示例已补齐 `#include` 与 `import` 双范式，便于在传统头文件模式与 C++23 模块模式间切换。"
+            )
+
+    reindented, cpp_reindented = _reindent_cpp_fenced_blocks(fixed)
+    if cpp_reindented:
+        fixed = reindented
+        changed = True
+        notes.append("说明：代码块已按统一缩进规则对齐（4 空格缩进，预处理行顶格）。")
 
     for note in notes:
         if note not in fixed:
@@ -439,6 +501,246 @@ def _rewrite_runtime_singleton_usage(text: str) -> tuple[str, bool]:
 
     return fixed, fixed != before
 
+
+def _ensure_http_dependency_steps(text: str) -> tuple[str, bool]:
+    fixed = text
+    before = fixed
+
+    if "galay-http" not in fixed:
+        return fixed, False
+
+    has_kernel = bool(_HTTP_KERNEL_CLONE_LINE_RE.search(fixed))
+    has_http = bool(_HTTP_HTTP_CLONE_LINE_RE.search(fixed))
+    has_utils = bool(_HTTP_UTILS_CLONE_LINE_RE.search(fixed))
+    if not (has_kernel and has_http) or has_utils:
+        return fixed, False
+
+    def _insert_after_kernel(match: re.Match[str]) -> str:
+        indent = match.group("indent")
+        return (
+            f"{indent}git clone https://github.com/gzj-creator/galay-kernel.git\n"
+            f"{indent}git clone https://github.com/gzj-creator/galay-utils.git"
+        )
+
+    fixed = _HTTP_KERNEL_CLONE_LINE_RE.sub(_insert_after_kernel, fixed, count=1)
+
+    if fixed == before:
+        def _insert_before_http(match: re.Match[str]) -> str:
+            indent = match.group("indent")
+            return (
+                f"{indent}git clone https://github.com/gzj-creator/galay-utils.git\n"
+                f"{match.group(0)}"
+            )
+
+        fixed = _HTTP_HTTP_CLONE_LINE_RE.sub(_insert_before_http, fixed, count=1)
+
+    return fixed, fixed != before
+
+
+def _ensure_dual_cpp_example_modes(text: str) -> tuple[str, bool]:
+    cpp_blocks = _extract_cpp_blocks(text)
+    if not cpp_blocks:
+        return text, False
+
+    include_code = next((code for code in cpp_blocks if _contains_galay_include(code)), "")
+    import_code = next((code for code in cpp_blocks if _contains_galay_import(code)), "")
+
+    if include_code and import_code:
+        return text, False
+
+    if include_code:
+        import_variant = _build_import_variant_from_include(include_code)
+        if not import_variant:
+            return text, False
+        appendix = (
+            "\n\n### import 版本\n\n```cpp\n"
+            f"{import_variant}\n"
+            "```"
+        )
+        return f"{text.rstrip()}{appendix}", True
+
+    if import_code:
+        include_variant = _build_include_variant_from_import(import_code)
+        if not include_variant:
+            return text, False
+        appendix = (
+            "\n\n### include 版本\n\n```cpp\n"
+            f"{include_variant}\n"
+            "```"
+        )
+        return f"{text.rstrip()}{appendix}", True
+
+    return text, False
+
+
+def _extract_cpp_blocks(text: str) -> List[str]:
+    blocks: List[str] = []
+    for match in _CPP_FENCE_BLOCK_RE.finditer(text):
+        lang = (match.group("lang") or "").strip().lower()
+        code = str(match.group("code") or "")
+        if lang in _CPP_LANGS or (not lang and _looks_like_cpp_snippet(code)):
+            blocks.append(code)
+    return blocks
+
+
+def _contains_galay_include(code: str) -> bool:
+    for raw in code.split("\n"):
+        match = _CPP_INCLUDE_LINE_RE.match(raw)
+        if not match:
+            continue
+        if _module_from_include_header(match.group("header") or ""):
+            return True
+    return False
+
+
+def _contains_galay_import(code: str) -> bool:
+    for raw in code.split("\n"):
+        match = _CPP_IMPORT_LINE_RE.match(raw)
+        if not match:
+            continue
+        module = (match.group("module") or "").strip()
+        if module in _GALAY_MODULE_TO_INCLUDE:
+            return True
+    return False
+
+
+def _build_import_variant_from_include(code: str) -> str:
+    modules: List[str] = []
+    body: List[str] = []
+
+    for raw in code.split("\n"):
+        include_match = _CPP_INCLUDE_LINE_RE.match(raw)
+        if include_match:
+            module = _module_from_include_header(include_match.group("header") or "")
+            if module:
+                if module not in modules:
+                    modules.append(module)
+                continue
+        body.append(raw.rstrip())
+
+    if not modules:
+        return ""
+
+    body = _trim_blank_edges(body)
+    output = [f"import {module};" for module in modules]
+    if body:
+        output.extend([""] + body)
+
+    return _reindent_cpp_code("\n".join(output))
+
+
+def _build_include_variant_from_import(code: str) -> str:
+    includes: List[str] = []
+    body: List[str] = []
+
+    for raw in code.split("\n"):
+        import_match = _CPP_IMPORT_LINE_RE.match(raw)
+        if import_match:
+            module = (import_match.group("module") or "").strip()
+            include_line = _GALAY_MODULE_TO_INCLUDE.get(module)
+            if include_line:
+                if include_line not in includes:
+                    includes.append(include_line)
+                continue
+        body.append(raw.rstrip())
+
+    if not includes:
+        return ""
+
+    body = _trim_blank_edges(body)
+    output = includes[:]
+    if body:
+        output.extend([""] + body)
+
+    return _reindent_cpp_code("\n".join(output))
+
+
+def _module_from_include_header(header: str) -> str:
+    normalized = str(header or "").strip()
+    for prefix, module in _GALAY_INCLUDE_PREFIX_TO_MODULE:
+        if normalized.startswith(prefix):
+            return module
+    return ""
+
+
+def _trim_blank_edges(lines: List[str]) -> List[str]:
+    cleaned = [str(line or "").rstrip() for line in lines]
+    while cleaned and not cleaned[0].strip():
+        cleaned.pop(0)
+    while cleaned and not cleaned[-1].strip():
+        cleaned.pop()
+    return cleaned
+
+
+def _reindent_cpp_fenced_blocks(text: str) -> tuple[str, bool]:
+    changed = False
+
+    def _replace(match: re.Match[str]) -> str:
+        nonlocal changed
+        lang = (match.group("lang") or "").strip().lower()
+        code = str(match.group("code") or "")
+        if lang not in _CPP_LANGS and not (not lang and _looks_like_cpp_snippet(code)):
+            return match.group(0)
+
+        normalized_code = _reindent_cpp_code(code)
+        normalized_lang = lang or "cpp"
+        if normalized_code != code or normalized_lang != lang:
+            changed = True
+
+        return f"```{normalized_lang}\n{normalized_code}\n```"
+
+    fixed = _CPP_FENCE_BLOCK_RE.sub(_replace, text)
+    return fixed, changed
+
+
+def _looks_like_cpp_snippet(code: str) -> bool:
+    sample_lines = [line.strip() for line in str(code or "").split("\n") if line.strip()]
+    if not sample_lines:
+        return False
+
+    sample = "\n".join(sample_lines[:16])
+    if "#include" in sample:
+        return True
+    if re.search(r"^\s*import\s+[A-Za-z_][A-Za-z0-9_.]*\s*;", sample, flags=re.MULTILINE):
+        return True
+    if "co_await" in sample or "co_return" in sample:
+        return True
+    if re.search(r"\b(?:int|void|auto|class|struct|namespace|template)\b", sample):
+        return True
+    if "{" in sample and "}" in sample:
+        return True
+    return False
+
+
+def _reindent_cpp_code(code: str) -> str:
+    lines = str(code or "").replace("\t", "    ").split("\n")
+    lines = _trim_blank_edges(lines)
+    if not lines:
+        return ""
+
+    output: List[str] = []
+    depth = 0
+
+    for raw in lines:
+        stripped = str(raw).strip()
+        if not stripped:
+            output.append("")
+            continue
+
+        starts_with_close = stripped.startswith("}")
+        indent_level = max(depth - 1, 0) if starts_with_close else depth
+        indent = "" if stripped.startswith("#") else ("    " * indent_level)
+        output.append(f"{indent}{stripped}")
+
+        open_count = stripped.count("{")
+        close_count = stripped.count("}")
+        depth += open_count - close_count
+        if depth < 0:
+            depth = 0
+
+    return "\n".join(output).rstrip()
+
+
 def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:
     if not text:
         return []
@@ -455,7 +757,7 @@ def _build_stream_preview(streamed_parts: List[str]) -> tuple[str, List[Dict[str
     preview_raw = "".join(streamed_parts).strip()
     if not preview_raw:
         return "", []
-    preview_text = _normalize_answer_text(preview_raw)
+    preview_text = _normalize_answer_text(preview_raw, finalize_examples=False)
     if not preview_text:
         return "", []
     return preview_text, _build_answer_blocks(preview_text)

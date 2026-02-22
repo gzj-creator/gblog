@@ -1,6 +1,6 @@
 # Galay-HTTP
 
-高性能 **C++23** 协程 HTTP/WebSocket/HTTP2 库，构建于 `galay-kernel` 之上。
+高性能 **C++23** 协程 HTTP/WebSocket/HTTP2 库，构建于 `galay-kernel` 与 `galay-utils` 之上。
 
 ## 特性
 
@@ -28,6 +28,7 @@
 - C++23 编译器（GCC 11+ / Clang 14+ / AppleClang 15+）
 - `spdlog`
 - `galay-kernel`
+- `galay-utils`
 - 可选：`galay-ssl` + OpenSSL（启用 TLS 时）
 
 ## 依赖安装（macOS / Homebrew）
@@ -51,6 +52,7 @@ sudo apt-get install -y libssl-dev
 
 ```bash
 git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-utils.git
 git clone https://github.com/gzj-creator/galay-http.git
 # 可选：启用 TLS 时一并拉取
 git clone https://github.com/gzj-creator/galay-ssl.git

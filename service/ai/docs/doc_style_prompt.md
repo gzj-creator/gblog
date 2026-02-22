@@ -10,7 +10,9 @@
 
 ## 适用范围
 
-- `repos/galay-*/**/*.md`（即每个仓库的所有 Markdown 文档）
+- `repos/galay-*/README.md`
+- `repos/galay-*/docs/**/*.md`
+- 显式排除：`repos/galay-*/.claude/**`、`repos/galay-*/todo/**`
 
 ## 统一输出规则
 

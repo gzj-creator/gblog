@@ -163,6 +163,7 @@ make verify-doc-style
 ### 6. 知识库自动重建与评测
 
 默认会同时索引 Markdown 与代码文件（`.h/.hpp/.cc/.cpp/...`），并跳过过大文件与二进制文件。
+另外会自动排除目录：`.claude/`、`todo/`（避免将规范草稿和待办笔记写入知识库）。
 
 ```bash
 # 一键重建（可选先从 frontend/docs 生成 galay-* markdown）

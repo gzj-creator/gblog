@@ -100,6 +100,7 @@ docker compose up -d
 ```
 
 AI 知识库文档默认从项目目录 `./repos` 挂载到容器内 `/docs/repos`。
+索引时会自动排除 `.claude/` 与 `todo/` 目录内容。
 
 如果页面一直转圈，可先做连通性检查：
 

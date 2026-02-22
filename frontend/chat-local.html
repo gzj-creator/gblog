@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 本地格式验证 | Galay Framework</title>
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/chat.css">
+    <link rel="stylesheet" href="css/chat-local.css">
+</head>
+<body>
+    <main class="chat-page chat-local-page">
+        <div class="chat-layout">
+            <aside class="chat-sidebar">
+                <div class="chat-sidebar-header">
+                    <div class="chat-brand">
+                        <svg class="chat-brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                        <div>
+                            <h2 class="chat-brand-title">Local Preview</h2>
+                            <span class="chat-brand-status">No Network</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-quick-questions">
+                    <h4 class="chat-quick-title">测试样例</h4>
+                    <button class="chat-quick-btn" data-question=":case raw_cmake">
+                        <span class="chat-quick-icon">&#9881;</span>
+                        脏流 + replace
+                    </button>
+                    <button class="chat-quick-btn" data-question=":case final_cmake">
+                        <span class="chat-quick-icon">&#9989;</span>
+                        规范化安装步骤
+                    </button>
+                    <button class="chat-quick-btn" data-question=":case quoted_fence">
+                        <span class="chat-quick-icon">&#128196;</span>
+                        引号 fence
+                    </button>
+                    <button class="chat-quick-btn" data-question=":case repeated_ol">
+                        <span class="chat-quick-icon">&#128209;</span>
+                        连续 1. 列表
+                    </button>
+                    <button class="chat-quick-btn" data-question=":case cpp_bash_mix">
+                        <span class="chat-quick-icon">&#128187;</span>
+                        C++ + Bash 代码块
+                    </button>
+                    <button class="chat-quick-btn" data-question=":help">
+                        <span class="chat-quick-icon">&#10067;</span>
+                        命令帮助
+                    </button>
+                </div>
+
+                <div class="chat-sidebar-footer">
+                    <p>本页面不会请求 AI 服务。输入内容将由本地 mock 返回，并使用当前前端相同渲染逻辑展示。</p>
+                </div>
+            </aside>
+
+            <section class="chat-main">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message bot-message">
+                        <div class="message-avatar">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <div class="message-content">
+                            <p>离线格式验证模式。</p>
+                            <p>你可以直接粘贴「模拟 AI 原始输出」后发送，或点左侧样例。</p>
+                            <p>快捷命令：<code>:case raw_cmake</code>、<code>:case final_cmake</code>、<code>:help</code></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="chat-input-container">
+                        <textarea
+                            id="chatInput"
+                            placeholder="粘贴模拟 AI 输出（支持多行 Markdown），按 Enter 发送，Shift+Enter 换行"
+                            rows="4"
+                        ></textarea>
+                        <button id="sendButton" class="chat-send-btn" aria-label="Send message">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="local-hint-row">
+                        <span>输入 <code>:raw 你的文本</code> 可强制原样回显。</span>
+                        <button id="clearChatBtn" type="button" class="local-clear-btn">清空消息</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script src="js/chat-local-mock.js?v=20260222a"></script>
+    <script src="js/chat.js?v=20260222a"></script>
+</body>
+</html>

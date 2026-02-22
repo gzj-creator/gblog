@@ -72,7 +72,7 @@ class ChatApp {
         return avatar;
     }
 
-    addMessage(text, type) {
+    addMessage(text, type, blocks = null) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${type}-message`;
 
@@ -81,8 +81,12 @@ class ChatApp {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
 
-        const formattedText = this.formatMessage(text);
-        contentDiv.innerHTML = formattedText;
+        if (type === 'bot' && Array.isArray(blocks) && blocks.length > 0) {
+            contentDiv.innerHTML = this.renderBlocks(blocks);
+        } else {
+            const formattedText = this.formatMessage(text);
+            contentDiv.innerHTML = formattedText;
+        }
 
         messageDiv.appendChild(contentDiv);
         this.chatMessages.appendChild(messageDiv);
@@ -131,11 +135,7 @@ class ChatApp {
             if (!explicitLang && !this._isLikelyCodeContent(displayCode, normalizedLang)) {
                 return `${prefix}\n${displayCode}\n`;
             }
-            const safeCode = this._highlightCode(displayCode, normalizedLang);
-            const safeLabel = this.escapeHtml(normalizedLang || 'text');
-            codeBlocks.push(
-                `<div class="code-block"><div class="code-block-toolbar"><span class="code-lang">${safeLabel}</span><button type="button" class="code-copy-btn">复制</button></div><pre><code${safeLang}>${safeCode}</code></pre></div>`
-            );
+            codeBlocks.push(this._buildCodeBlockHtml(displayCode, normalizedLang, safeLang));
             return `${prefix}\n@@CODEBLOCK_${codeIndex}@@\n`;
         });
 
@@ -255,6 +255,87 @@ class ChatApp {
         flushParagraph();
         flushBlockquote();
         closeList();
+
+        return htmlParts.join('');
+    }
+
+    _buildCodeBlockHtml(displayCode, normalizedLang, safeLang) {
+        const language = (normalizedLang || 'text').trim().toLowerCase() || 'text';
+        const classAttr = safeLang || (language ? ` class="language-${this.escapeHtml(language)}"` : '');
+        const safeCode = this._highlightCode(displayCode, language);
+        const safeLabel = this.escapeHtml(language);
+        return `<div class="code-block"><div class="code-block-toolbar"><span class="code-lang">${safeLabel}</span><button type="button" class="code-copy-btn">复制</button></div><pre><code${classAttr}>${safeCode}</code></pre></div>`;
+    }
+
+    renderBlocks(blocks) {
+        if (!Array.isArray(blocks) || blocks.length === 0) {
+            return '';
+        }
+
+        const htmlParts = [];
+        for (const block of blocks) {
+            if (!block || typeof block !== 'object') continue;
+            const type = String(block.type || '').toLowerCase();
+
+            if (type === 'heading') {
+                const level = Math.min(Math.max(Number(block.level) || 1, 1), 6);
+                const text = this._formatInlineMarkdown(String(block.text || ''));
+                htmlParts.push(`<h${level}>${text}</h${level}>`);
+                continue;
+            }
+
+            if (type === 'paragraph') {
+                const text = String(block.text || '');
+                if (!text.trim()) continue;
+                const html = text.split('\n').map(line => this._formatInlineMarkdown(line)).join('<br>');
+                htmlParts.push(`<p>${html}</p>`);
+                continue;
+            }
+
+            if (type === 'blockquote') {
+                const text = String(block.text || '');
+                if (!text.trim()) continue;
+                const html = text.split('\n').map(line => this._formatInlineMarkdown(line)).join('<br>');
+                htmlParts.push(`<blockquote>${html}</blockquote>`);
+                continue;
+            }
+
+            if (type === 'hr') {
+                htmlParts.push('<hr>');
+                continue;
+            }
+
+            if (type === 'list') {
+                const items = Array.isArray(block.items) ? block.items : [];
+                if (items.length === 0) continue;
+                const isOrdered = Boolean(block.ordered);
+                if (isOrdered) {
+                    const start = Number(block.start) || 1;
+                    htmlParts.push(start > 1 ? `<ol start="${start}">` : '<ol>');
+                    for (const item of items) {
+                        htmlParts.push(`<li>${this._formatInlineMarkdown(String(item || ''))}</li>`);
+                    }
+                    htmlParts.push('</ol>');
+                } else {
+                    htmlParts.push('<ul>');
+                    for (const item of items) {
+                        htmlParts.push(`<li>${this._formatInlineMarkdown(String(item || ''))}</li>`);
+                    }
+                    htmlParts.push('</ul>');
+                }
+                continue;
+            }
+
+            if (type === 'code') {
+                const language = String(block.language || 'text').trim().toLowerCase() || 'text';
+                const rawCode = String(block.code || '');
+                const displayCode = this._normalizeCodeForDisplay(rawCode.replace(/\n$/, ''), language);
+                if (!displayCode.trim()) continue;
+                const safeLang = ` class="language-${this.escapeHtml(language)}"`;
+                htmlParts.push(this._buildCodeBlockHtml(displayCode, language, safeLang));
+                continue;
+            }
+        }
 
         return htmlParts.join('');
     }
@@ -968,6 +1049,7 @@ class ChatApp {
                     gotContent = gotContent || Boolean((fullText || '').trim());
                 });
                 fullText = flushResult.fullText;
+                gotContent = gotContent || Boolean((contentDiv.innerHTML || '').trim());
                 streamComplete = streamComplete || flushResult.streamComplete;
                 break;
             }
@@ -979,6 +1061,7 @@ class ChatApp {
             });
             fullText = parseResult.fullText;
             buffer = parseResult.tail;
+            gotContent = gotContent || Boolean((contentDiv.innerHTML || '').trim());
             streamComplete = streamComplete || parseResult.streamComplete;
             if (streamComplete) {
                 try {
@@ -992,7 +1075,11 @@ class ChatApp {
 
         if (!gotContent) {
             const fallback = await this._callNonStreamAPI(message);
-            contentDiv.innerHTML = this.formatMessage(fallback.response);
+            if (Array.isArray(fallback.blocks) && fallback.blocks.length > 0) {
+                contentDiv.innerHTML = this.renderBlocks(fallback.blocks);
+            } else {
+                contentDiv.innerHTML = this.formatMessage(fallback.response);
+            }
             if (fallback.sources && fallback.sources.length > 0) {
                 this.addSources(fallback.sources);
             }
@@ -1014,10 +1101,15 @@ class ChatApp {
 
             try {
                 const data = JSON.parse(payload);
+                const blocks = Array.isArray(data.blocks) ? data.blocks : [];
                 const replaceText = this._coerceText(data.replace);
                 if (replaceText) {
                     fullText = replaceText;
-                    contentDiv.innerHTML = this.formatMessage(fullText);
+                    if (blocks.length > 0) {
+                        contentDiv.innerHTML = this.renderBlocks(blocks);
+                    } else {
+                        contentDiv.innerHTML = this.formatMessage(fullText);
+                    }
                     this.scrollToBottom();
                     onTextUpdate(fullText);
                 }
@@ -1030,6 +1122,11 @@ class ChatApp {
                 }
                 if (data.done && data.sources && data.sources.length > 0) {
                     this.addSources(data.sources);
+                }
+                if (data.done && blocks.length > 0) {
+                    contentDiv.innerHTML = this.renderBlocks(blocks);
+                    this.scrollToBottom();
+                    onTextUpdate(fullText);
                 }
                 if (data.done) {
                     streamComplete = true;
@@ -1069,8 +1166,10 @@ class ChatApp {
 
         const body = await response.json();
         const responseText = this._coerceText(body.response).trim();
+        const blocks = Array.isArray(body.blocks) ? body.blocks : [];
         return {
             response: responseText || '抱歉，未返回可显示内容。',
+            blocks,
             sources: Array.isArray(body.sources) ? body.sources : [],
         };
     }

@@ -72,9 +72,13 @@ async def chat_stream(payload: ChatRequest, request: Request):
             )
             response_text = result.get("response", "")
             sources = result.get("sources", [])
+            blocks = result.get("blocks", [])
             if response_text:
-                yield _event({"content": response_text})
-            yield _event({"done": True, "sources": sources})
+                if blocks:
+                    yield _event({"replace": response_text, "blocks": blocks})
+                else:
+                    yield _event({"content": response_text})
+            yield _event({"done": True, "sources": sources, "blocks": blocks})
         except TimeoutError:
             yield _event({"error": "LLM request timed out"})
             yield _event({"done": True, "sources": []})

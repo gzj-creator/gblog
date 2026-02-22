@@ -151,6 +151,9 @@ python scripts/run_server.py --reload
 
 ```bash
 make test
+
+# 本地格式回归（不依赖 AI 网络调用）
+make verify-format
 ```
 
 ### 6. 知识库自动重建与评测

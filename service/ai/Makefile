@@ -1,4 +1,4 @@
-.PHONY: install install-linux run build-index build-index-force rebuild-kb eval-kb test docker-build docker-up docker-down clean
+.PHONY: install install-linux run build-index build-index-force rebuild-kb eval-kb verify-format test docker-build docker-up docker-down clean
 
 PYTHON ?= python3
 
@@ -22,6 +22,14 @@ rebuild-kb:
 
 eval-kb:
 	$(PYTHON) scripts/evaluate_kb.py --mode all
+
+verify-format:
+	$(PYTHON) scripts/verify_markdown_format.py
+	@if command -v node >/dev/null 2>&1; then \
+		node ../../frontend/js/chat-local-regression.test.cjs; \
+	else \
+		echo "Skip frontend regression: node not found"; \
+	fi
 
 test:
 	$(PYTHON) scripts/test_api.py

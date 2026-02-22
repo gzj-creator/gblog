@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.core.markdown_blocks import markdown_to_blocks
 from src.core.markdown_normalizer import normalize_markdown_content
 from src.core.vector_store import VectorStoreManager
 from src.services.rag_service import RAGService, SYSTEM_PROMPT
@@ -16,7 +17,6 @@ logger = get_logger(__name__)
 
 MAX_SESSIONS = 100
 MAX_HISTORY_ROUNDS = 20
-STREAM_BLOCK_SUFFIX = "\n\n"
 STREAM_EMIT_MIN_CHARS = 16
 STREAM_EMIT_MAX_CHARS = 120
 
@@ -50,12 +50,14 @@ class ChatService:
             answer = _normalize_answer_text(_extract_message_text(response))
             if not answer.strip():
                 answer = "抱歉，模型返回了空内容，请稍后重试。"
+            blocks = _build_answer_blocks(answer)
 
             self._append_history(session_id, message, answer)
 
             return {
                 "success": True,
                 "response": answer,
+                "blocks": blocks,
                 "sources": sources,
                 "session_id": session_id,
             }
@@ -88,7 +90,11 @@ class ChatService:
                             break
                         emitted_any = True
                         streamed_parts.append(emit_piece)
-                        yield {"content": emit_piece}
+                        partial_text, partial_blocks = _build_stream_preview(streamed_parts)
+                        if partial_text:
+                            yield {"replace": partial_text, "blocks": partial_blocks, "partial": True}
+                        else:
+                            yield {"content": emit_piece}
 
             raw_answer = "".join(raw_answer_parts)
             if not raw_answer.strip():
@@ -98,33 +104,36 @@ class ChatService:
                 normalized_answer = _normalize_answer_text(raw_answer)
                 if not normalized_answer:
                     normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
-                for block in _split_answer_blocks(normalized_answer):
-                    yield {"content": block}
+                answer_blocks = _build_answer_blocks(normalized_answer)
+                yield {"replace": normalized_answer, "blocks": answer_blocks}
                 answer = normalized_answer
             else:
                 tail_piece = _finalize_stream_tail(stream_buffer)
                 if tail_piece:
                     emitted_any = True
-                    yield {"content": tail_piece}
+                    streamed_parts.append(tail_piece)
+                    partial_text, partial_blocks = _build_stream_preview(streamed_parts)
+                    if partial_text:
+                        yield {"replace": partial_text, "blocks": partial_blocks, "partial": True}
+                    else:
+                        yield {"content": tail_piece}
 
                 normalized_answer = _normalize_answer_text(raw_answer)
                 if not normalized_answer:
                     normalized_answer = "抱歉，模型返回了空内容，请稍后重试。"
+                answer_blocks = _build_answer_blocks(normalized_answer)
 
                 # 防止清洗后无可显示内容时流为空，兜底补发标准分块文本。
                 if not emitted_any:
-                    for block in _split_answer_blocks(normalized_answer):
-                        yield {"content": block}
+                    yield {"replace": normalized_answer, "blocks": answer_blocks}
                 else:
-                    streamed_text = "".join(streamed_parts).strip()
-                    if streamed_text != normalized_answer.strip():
-                        # 统一规则最终落地：以规范化后的全文覆盖流式中间态。
-                        yield {"replace": normalized_answer}
+                    # 统一规则最终落地：始终以规范化后的全文覆盖流式中间态。
+                    yield {"replace": normalized_answer, "blocks": answer_blocks}
                 answer = normalized_answer
 
             self._append_history(session_id, message, answer)
 
-            yield {"done": True, "sources": sources}
+            yield {"done": True, "sources": sources, "blocks": answer_blocks}
         except Exception as e:
             logger.error(f"Chat stream error: {e}")
             yield {"error": str(e)}
@@ -137,11 +146,13 @@ class ChatService:
                 return {
                     "success": True,
                     "response": "抱歉，我在文档中没有找到相关信息。请尝试换个方式提问。",
+                    "blocks": _build_answer_blocks("抱歉，我在文档中没有找到相关信息。请尝试换个方式提问。"),
                     "sources": [],
                 }
             answer = _normalize_answer_text(self._rag.generate(message, docs))
+            blocks = _build_answer_blocks(answer)
             sources = _extract_sources(docs)
-            return {"success": True, "response": answer, "sources": sources}
+            return {"success": True, "response": answer, "blocks": blocks, "sources": sources}
         except Exception as e:
             logger.error(f"Query error: {e}")
             raise ChatServiceError(f"Query failed: {e}")
@@ -268,6 +279,28 @@ def _normalize_answer_text(raw: str) -> str:
     return normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
 
 
+def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:
+    if not text:
+        return []
+    try:
+        return markdown_to_blocks(text)
+    except Exception as exc:
+        logger.warning(f"build markdown blocks failed: {exc}")
+        return [{"type": "paragraph", "text": text}]
+
+
+def _build_stream_preview(streamed_parts: List[str]) -> tuple[str, List[Dict[str, Any]]]:
+    if not streamed_parts:
+        return "", []
+    preview_raw = "".join(streamed_parts).strip()
+    if not preview_raw:
+        return "", []
+    preview_text = _normalize_answer_text(preview_raw)
+    if not preview_text:
+        return "", []
+    return preview_text, _build_answer_blocks(preview_text)
+
+
 def _strip_decorative_symbols(text: str) -> str:
     # 去掉常见装饰 emoji / 图标符号，保留中文标点与 Markdown 基础结构。
     decorative = (
@@ -276,18 +309,6 @@ def _strip_decorative_symbols(text: str) -> str:
     stripped = re.sub(decorative, "", text)
     stripped = re.sub(r"\s*---+\s*", "\n", stripped)
     return stripped
-
-
-def _split_answer_blocks(answer: str) -> List[str]:
-    blocks = [block.strip() for block in answer.split("\n\n") if block.strip()]
-    if not blocks:
-        return []
-
-    chunks: List[str] = []
-    for index, block in enumerate(blocks):
-        suffix = STREAM_BLOCK_SUFFIX if index + 1 < len(blocks) else ""
-        chunks.append(f"{block}{suffix}")
-    return chunks
 
 
 def _sanitize_stream_fragment(fragment: str) -> str:

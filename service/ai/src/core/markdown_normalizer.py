@@ -201,9 +201,12 @@ def _normalize_outside_fences(text: str, normalizer) -> str:
         if _is_fence_line(fence_candidate):
             flush_plain()
             output.append(fence_candidate)
-            in_fence = not in_fence if _is_fence_close(fence_candidate) else True
-            if _is_fence_close(fence_candidate):
-                in_fence = False
+            if in_fence:
+                # 仅把裸 ``` 视为关闭；```lang 出现在 fence 内按普通内容保留在 fence 中。
+                if _is_fence_close(fence_candidate):
+                    in_fence = False
+            else:
+                in_fence = True
             continue
 
         if in_fence:
@@ -599,6 +602,11 @@ def _find_inline_code_start(line: str) -> int:
             candidate = line[match.start():].strip()
             if pattern.pattern.startswith(r"\$?") and not _looks_like_shell_command(candidate):
                 continue
+            if pattern.pattern.startswith(r"\$?"):
+                prefix = line[: match.start()].rstrip()
+                # 仅在“说明: 命令”类上下文做行内命令拆分，避免把标题中的 Docker Compose 误判为命令。
+                if not re.search(r"[:：]$", prefix):
+                    continue
             starts.append(match.start())
 
     return min(starts) if starts else -1

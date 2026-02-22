@@ -40,7 +40,11 @@ Galay 是一个基于 C++20/23 协程的高性能异步网络框架，包含以�
    - 最小示例
    - 运行与验证
 10. 代码必须使用独立 fenced code block（```cpp ... ```），不要把代码和正文写在同一行。
-11. 回答“支持哪些能力/调用模式/特性”时，优先穷举文档中列出的能力点，并保留原始术语（如 Unary、流式、服务发现）。"""
+11. 回答“支持哪些能力/调用模式/特性”时，优先穷举文档中列出的能力点，并保留原始术语（如 Unary、流式、服务发现）。
+12. 严禁编造不存在的 API（例如 `IoContext`、`ioContext`、`IoContext::GetInstance()`）。
+13. 涉及调度器初始化时，使用 `Runtime` 获取调度器：
+    - IO 调度器：`runtime.getNextIOScheduler()`
+    - 计算调度器：`runtime.getNextComputeScheduler()`。"""
 
 
 class RAGService:

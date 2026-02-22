@@ -16,6 +16,11 @@ logger = get_logger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
+CHAT_TIMEOUT_SECONDS = 120
+STREAM_QUERY_TIMEOUT_SECONDS = 120
+STREAM_HEARTBEAT_SECONDS = 10
+STREAM_MEMORY_TIMEOUT_SECONDS = 180
+
 
 @router.post("/chat", response_model=ChatResponse)
 @limiter.limit("30/minute")
@@ -31,12 +36,12 @@ async def chat(payload: ChatRequest, request: Request):
         if payload.use_memory:
             result = await asyncio.wait_for(
                 run_in_threadpool(svc.chat, payload.message, payload.session_id),
-                timeout=60,
+                timeout=CHAT_TIMEOUT_SECONDS,
             )
         else:
             result = await asyncio.wait_for(
                 run_in_threadpool(svc.query, payload.message),
-                timeout=60,
+                timeout=CHAT_TIMEOUT_SECONDS,
             )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="LLM request timed out") from None
@@ -59,8 +64,30 @@ async def chat_stream(payload: ChatRequest, request: Request):
 
     async def event_generator():
         try:
+            # 首包尽快返回，降低代理/前端连接阶段超时概率。
+            yield _event({"ping": True, "stage": "accepted"})
+
             if payload.use_memory:
-                async for data in svc.chat_stream(payload.message, payload.session_id):
+                stream_iter = svc.chat_stream(payload.message, payload.session_id).__aiter__()
+                start_at = asyncio.get_running_loop().time()
+                while True:
+                    if asyncio.get_running_loop().time() - start_at > STREAM_MEMORY_TIMEOUT_SECONDS:
+                        yield _event({"error": "LLM stream timed out"})
+                        yield _event({"done": True, "sources": []})
+                        break
+
+                    try:
+                        data = await asyncio.wait_for(
+                            stream_iter.__anext__(),
+                            timeout=STREAM_HEARTBEAT_SECONDS,
+                        )
+                    except StopAsyncIteration:
+                        break
+                    except TimeoutError:
+                        # 心跳包，避免长思考场景下前端/代理误判超时。
+                        yield _event({"ping": True})
+                        continue
+
                     yield _event(data)
                     if data.get("done") or data.get("error"):
                         break
@@ -68,7 +95,7 @@ async def chat_stream(payload: ChatRequest, request: Request):
 
             result = await asyncio.wait_for(
                 run_in_threadpool(svc.query, payload.message),
-                timeout=60,
+                timeout=STREAM_QUERY_TIMEOUT_SECONDS,
             )
             response_text = result.get("response", "")
             sources = result.get("sources", [])

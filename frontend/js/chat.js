@@ -1,7 +1,7 @@
 const AI_API_BASE = '/ai';
-const STREAM_CONNECT_TIMEOUT_MS = 15000;
-const STREAM_IDLE_TIMEOUT_MS = 45000;
-const FALLBACK_CONNECT_TIMEOUT_MS = 5000;
+const STREAM_CONNECT_TIMEOUT_MS = 45000;
+const STREAM_IDLE_TIMEOUT_MS = 120000;
+const FALLBACK_CONNECT_TIMEOUT_MS = 130000;
 
 class ChatApp {
     constructor() {
@@ -54,9 +54,16 @@ class ChatApp {
         } catch (error) {
             this.removeTypingIndicator();
             let detail = this._extractErrorDetail(error);
-            if (this._isConnectTimeoutError(error)) {
+            if (this._isRetryableTimeoutError(error)) {
                 try {
-                    await this._callNonStreamAPI(message, FALLBACK_CONNECT_TIMEOUT_MS);
+                    const fallback = await this._callNonStreamAPI(message, FALLBACK_CONNECT_TIMEOUT_MS);
+                    this.addMessage(fallback.response, 'bot', fallback.blocks);
+                    if (fallback.sources && fallback.sources.length > 0) {
+                        this.addSources(fallback.sources);
+                    }
+                    this.sendButton.disabled = false;
+                    this.chatInput.focus();
+                    return;
                 } catch (fallbackError) {
                     const fallbackDetail = this._extractErrorDetail(fallbackError);
                     if (fallbackDetail) {
@@ -1085,7 +1092,7 @@ class ChatApp {
         }
 
         if (!gotContent) {
-            const fallback = await this._callNonStreamAPI(message);
+            const fallback = await this._callNonStreamAPI(message, FALLBACK_CONNECT_TIMEOUT_MS);
             if (Array.isArray(fallback.blocks) && fallback.blocks.length > 0) {
                 contentDiv.innerHTML = this.renderBlocks(fallback.blocks);
             } else {
@@ -1215,9 +1222,10 @@ class ChatApp {
         return message.slice(0, 180);
     }
 
-    _isConnectTimeoutError(error) {
+    _isRetryableTimeoutError(error) {
         if (!error || !error.message) return false;
-        return String(error.message).includes('连接 AI 服务超时');
+        const msg = String(error.message);
+        return msg.includes('连接 AI 服务超时') || msg.includes('AI 响应超时');
     }
 
     _coerceText(value) {

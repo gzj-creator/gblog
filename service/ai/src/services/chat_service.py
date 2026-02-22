@@ -20,6 +20,12 @@ MAX_HISTORY_ROUNDS = 20
 STREAM_EMIT_MIN_CHARS = 16
 STREAM_EMIT_MAX_CHARS = 120
 
+_FORBIDDEN_SCHEDULER_APIS = (
+    re.compile(r"\b(?:IoContext|IOContext)\s*::\s*GetInstance\s*\(\s*\)", re.IGNORECASE),
+    re.compile(r"\bioContext\b"),
+    re.compile(r"\bIoContext\b"),
+)
+
 
 class ChatService:
     """对话服务（含会话记忆）"""
@@ -276,7 +282,36 @@ def _normalize_answer_text(raw: str) -> str:
     if not raw:
         return ""
 
-    return normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
+    normalized = normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
+    return _enforce_scheduler_api_consistency(normalized)
+
+
+def _enforce_scheduler_api_consistency(text: str) -> str:
+    if not text:
+        return ""
+
+    if not any(pattern.search(text) for pattern in _FORBIDDEN_SCHEDULER_APIS):
+        return text
+
+    fixed = text
+    fixed = re.sub(
+        r"\b(?:IoContext|IOContext)\s*::\s*GetInstance\s*\(\s*\)",
+        "runtime.getNextIOScheduler()",
+        fixed,
+        flags=re.IGNORECASE,
+    )
+    fixed = re.sub(r"\bioContext\b", "ioScheduler", fixed)
+    fixed = re.sub(r"\bIoContext\b", "IOScheduler", fixed)
+
+    note = (
+        "说明：Galay 当前没有 `IoContext` 单例 API，请使用 `Runtime` 获取调度器："
+        "`runtime.getNextIOScheduler()` / `runtime.getNextComputeScheduler()`。"
+    )
+    if note not in fixed:
+        fixed = f"{fixed.rstrip()}\n\n{note}"
+
+    logger.warning("Detected forbidden IoContext API in model output, auto-corrected")
+    return fixed
 
 
 def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:

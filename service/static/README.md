@@ -37,7 +37,7 @@ cmake -S service/static -B build/static \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_PREFIX_PATH=/usr/local \
   -DGALAY_KERNEL_BACKEND=epoll
-cmake --build build/static -j"$(nproc)"
+cmake --build build/static --parallel
 ```
 
 产物：

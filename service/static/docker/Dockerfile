@@ -27,7 +27,7 @@ RUN set -eu; \
         -DCMAKE_PREFIX_PATH=/usr/local \
         -DGALAY_KERNEL_BACKEND="${KERNEL_BACKEND}"; \
     fi; \
-    cmake --build "${BUILD_DIR}" -j"$(nproc)"; \
+    cmake --build "${BUILD_DIR}" --parallel; \
     cp "${BUILD_DIR}/static-server" /tmp/static-server
 
 FROM scratch AS artifact

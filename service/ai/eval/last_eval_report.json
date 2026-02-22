@@ -1,0 +1,451 @@
+{
+  "summary": {
+    "total": 11,
+    "passed": 9,
+    "failed": 2,
+    "pass_rate": 0.8182,
+    "min_pass_rate": 0.7
+  },
+  "cases": [
+    {
+      "id": "kernel-runtime-role",
+      "query": "galay-kernel 的核心职责是什么？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-kernel",
+          "galay-kernel",
+          "galay-kernel",
+          "galay-kernel",
+          "galay-kernel"
+        ],
+        "sources": [
+          "README.md",
+          "docs/01-API文档.md",
+          "docs/03-计算调度器.md",
+          "docs/10-定时器调度器.md",
+          "docs/05-调度器.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 3,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-kernel",
+          "galay-kernel",
+          "galay-kernel",
+          "galay-kernel"
+        ],
+        "answer_preview": "galay-kernel 的核心职责是提供高性能的异步运行时环境，支撑整个 Galay 框架的协程调度、事件循环和跨平台异步 IO 能力。它专注于底层执行层的性能优化与并发模型设计，不涉及上层协议语义或业务逻辑编排。\n1. **协程调度管理"
+      },
+      "pass": true
+    },
+    {
+      "id": "ssl-core-components",
+      "query": "galay-ssl 的核心组件有哪些？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-ssl",
+          "galay-ssl",
+          "galay-ssl",
+          "galay-ssl",
+          "galay-ssl"
+        ],
+        "sources": [
+          "docs/01-快速开始.md",
+          "README.md",
+          "docs/05-性能分析.md",
+          "docs/03-模块介绍.md",
+          "docs/02-使用示例.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 3,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-ssl",
+          "galay-ssl",
+          "galay-ssl",
+          "galay-ssl"
+        ],
+        "answer_preview": "galay-ssl 的核心组件包括以下几个部分：\n1. **SslContext** — 负责证书、私钥、TLS 方法与校验策略等上下文配置\n2. **SslSocket** — 异步 TLS 套接字，封装 `connect/handsha"
+      },
+      "pass": true
+    },
+    {
+      "id": "http-protocol-support",
+      "query": "galay-http 支持哪些协议能力？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-http",
+          "galay-http",
+          "galay-http",
+          "galay-http",
+          "galay-http"
+        ],
+        "sources": [
+          "docs/3-使用指南.md",
+          "README.md",
+          "docs/1-架构设计.md",
+          "docs/2-API参考.md",
+          "docs/README.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 3,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-http",
+          "galay-http",
+          "galay-http",
+          "galay-http"
+        ],
+        "answer_preview": "galay-http 支持以下协议能力：\n1. HTTP/1.1 协议实现，包括请求解析与响应生成\n2. HTTP/2 (h2c) 协议支持，允许在明文连接上使用 HTTP/2\n3. WebSocket 协议支持，包括 ws 和 wss 类"
+      },
+      "pass": true
+    },
+    {
+      "id": "rpc-call-modes",
+      "query": "galay-rpc 主要支持哪些调用模式？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-rpc",
+          "galay-rpc",
+          "galay-rpc",
+          "galay-rpc",
+          "galay-rpc"
+        ],
+        "sources": [
+          "README.md",
+          "docs/02-API参考.md",
+          "docs/03-使用指南.md",
+          "docs/01-架构设计.md",
+          "docs/04-性能测试.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 2,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-rpc",
+          "galay-rpc",
+          "galay-rpc",
+          "galay-rpc"
+        ],
+        "answer_preview": "galay-rpc 主要支持以下调用模式：\n1. Unary（一元调用）\n2. 双向流（Bidirectional Stream）\n3. 服务发现（Service Discovery）\n\n这些调用模式构成了 galay-rpc 的核心通信能"
+      },
+      "pass": true
+    },
+    {
+      "id": "redis-pipeline",
+      "query": "galay-redis 的 pipeline 能解决什么问题？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-redis",
+          "galay-redis",
+          "galay-redis",
+          "galay-redis",
+          "galay-redis"
+        ],
+        "sources": [
+          "README.md",
+          "docs/01-快速开始.md",
+          "docs/03-模块介绍.md",
+          "docs/04-运行原理.md",
+          "docs/05-性能分析.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 3,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-redis",
+          "galay-redis",
+          "galay-redis",
+          "galay-redis"
+        ],
+        "answer_preview": "galay-redis 的 pipeline 主要用于优化网络通信效率，通过将多个 Redis 命令打包成一次网络请求来减少往返时间（RTT），从而提升整体性能。它特别适用于需要执行大量独立命令但又希望降低延迟的场景。\n1. **减少网络往"
+      },
+      "pass": true
+    },
+    {
+      "id": "mysql-transaction",
+      "query": "galay-mysql 在事务和预处理方面有什么能力？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-mysql",
+          "galay-mysql",
+          "galay-mysql",
+          "galay-mysql",
+          "galay-mysql"
+        ],
+        "sources": [
+          "docs/03-API文档.md",
+          "docs/01-快速开始.md",
+          "README.md",
+          "docs/02-架构设计.md",
+          "docs/04-示例代码.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 3,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-mysql",
+          "galay-mysql",
+          "galay-mysql",
+          "galay-mysql"
+        ],
+        "answer_preview": "galay-mysql 在事务和预处理方面提供了完整的支持，能够满足高性能异步数据库操作的需求。以下是详细的能力说明：\n1. **事务支持**\n- 支持标准 SQL 事务语法，包括 `START TRANSACTION`、`COMMIT` "
+      },
+      "pass": true
+    },
+    {
+      "id": "mongo-auth",
+      "query": "galay-mongo 支持什么认证方式和并发能力？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-mongo",
+          "galay-mongo",
+          "galay-mongo",
+          "galay-mongo",
+          "galay-mongo"
+        ],
+        "sources": [
+          "docs/02-API参考.md",
+          "README.md",
+          "docs/04-性能测试.md",
+          "docs/01-架构设计.md",
+          "docs/03-使用指南.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 2,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-mongo",
+          "galay-mongo",
+          "galay-mongo",
+          "galay-mongo"
+        ],
+        "answer_preview": "galay-mongo 支持的认证方式和并发能力如下：\n1. 认证方式\n- 支持 SCRAM-SHA-256 认证机制\n- 同步和异步 API 均使用相同的认证逻辑\n- 连接时自动触发认证过程\n- 用户名和密码同时为空时跳过认证\n- 仅提供"
+      },
+      "pass": true
+    },
+    {
+      "id": "etcd-features",
+      "query": "galay-etcd 提供哪些关键能力？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-etcd",
+          "galay-etcd",
+          "galay-etcd",
+          "galay-etcd",
+          "galay-mongo"
+        ],
+        "sources": [
+          "README.md",
+          "docs/01-快速开始.md",
+          "docs/03-测试与压测.md",
+          "docs/02-API参考.md",
+          "docs/04-性能测试.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 2,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-etcd",
+          "galay-etcd",
+          "galay-etcd",
+          "galay-etcd"
+        ],
+        "answer_preview": "galay-etcd 提供了以下关键能力：\n1. etcd v3 协议的完整客户端支持，包括 KV 操作、租约管理、前缀查询和 Pipeline 操作\n2. 异步协程接口，基于 galay-kernel 的事件循环机制\n3. 同步包装器接口"
+      },
+      "pass": true
+    },
+    {
+      "id": "utils-engineering",
+      "query": "galay-utils 里有哪些常见工程能力？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-utils",
+          "galay-utils",
+          "galay-utils",
+          "galay-utils",
+          "galay-utils"
+        ],
+        "sources": [
+          "README.md",
+          "docs/balancer.md",
+          "docs/system.md",
+          "docs/circuitbreaker.md",
+          "docs/huffman.md"
+        ]
+      },
+      "chat": {
+        "ok": false,
+        "status": 200,
+        "keyword_ok": false,
+        "keyword_hit": 0,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-utils",
+          "galay-utils",
+          "galay-utils",
+          "galay-utils"
+        ],
+        "answer_preview": "galay-utils 提供了多种常见的工程能力，主要集中在基础工具、并发控制、限流熔断和负载均衡等方面。这些能力以头文件形式提供，具备良好的可组合性和跨平台特性。\n1. **字符串处理能力**\n- 包含字符串分割、拼接、trim、大小写转"
+      },
+      "pass": false
+    },
+    {
+      "id": "mcp-transport",
+      "query": "galay-mcp 支持哪些传输方式？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-mcp",
+          "galay-mcp",
+          "galay-mcp",
+          "galay-mcp",
+          "galay-mcp"
+        ],
+        "sources": [
+          "README.md",
+          "docs/02-标准输入输出MCP测试.md",
+          "docs/03-Stdio服务器测试.md",
+          "docs/06-HTTP服务器测试.md",
+          "docs/05-HTTP客户端测试.md"
+        ]
+      },
+      "chat": {
+        "ok": true,
+        "status": 200,
+        "keyword_ok": true,
+        "keyword_hit": 2,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-mcp",
+          "galay-mcp",
+          "galay-mcp",
+          "galay-mcp"
+        ],
+        "answer_preview": "galay-mcp 支持以下两种传输方式：\n1. **Stdio 传输**：面向本地 Agent 的 stdin/stdout 传输，适用于本地进程间通信场景。\n2. **HTTP 传输**：面向远程服务化的 HTTP 传输，支持标准 HT"
+      },
+      "pass": true
+    },
+    {
+      "id": "ecosystem-layering",
+      "query": "Galay 生态分层有哪些？",
+      "search": {
+        "ok": true,
+        "status": 200,
+        "result_count": 5,
+        "project_ok": true,
+        "file_ok": true,
+        "projects": [
+          "galay-ecosystem",
+          "galay-mongo",
+          "galay-mysql",
+          "galay-kernel",
+          "galay-mysql"
+        ],
+        "sources": [
+          "README.md",
+          "docs/03-使用指南.md",
+          "docs/01-快速开始.md",
+          "docs/01-API文档.md",
+          "docs/02-架构设计.md"
+        ]
+      },
+      "chat": {
+        "ok": false,
+        "status": 200,
+        "keyword_ok": false,
+        "keyword_hit": 1,
+        "source_project_ok": true,
+        "source_projects": [
+          "galay-ecosystem",
+          "galay-mongo",
+          "galay-mysql",
+          "galay-kernel"
+        ],
+        "answer_preview": "Galay 生态采用分层设计，将不同功能模块按职责划分，便于组合使用与扩展。其分层结构如下：\n1. **运行时层（Kernel Layer）**\n- 核心协程运行时，提供跨平台的事件循环支持（kqueue/epoll/io_uring）。\n"
+      },
+      "pass": false
+    }
+  ]
+}

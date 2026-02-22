@@ -144,7 +144,7 @@ session.close();</code></pre>
 
 <h2>构建</h2>
 <pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j</code></pre>
+cmake --build build --parallel</code></pre>
 
 <h3>构建选项</h3>
 <pre><code>-DGALAY_MYSQL_BUILD_TESTS=ON/OFF

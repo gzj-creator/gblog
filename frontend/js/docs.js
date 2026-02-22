@@ -205,7 +205,7 @@ cd galay-http</code></pre>
             <h2>编译运行</h2>
             <pre><code>mkdir build && cd build
 cmake ..
-make -j$(nproc)
+make -j
 ./examples/hello_world</code></pre>
 
             <h2>第一个程序</h2>
@@ -252,7 +252,7 @@ int main() {
 cd galay-http
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+make -j
 sudo make install</code></pre>
 
             <h3>编译选项</h3>

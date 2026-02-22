@@ -19,7 +19,7 @@ galay-mongo 是 Galay 库体系的 MongoDB 客户端组件，覆盖 OP_MSG、BSO
 
 ### 同步 Ping（example/include/E1-SyncPing.cc）
 
-```
+```cpp
 #include "galay-mongo/sync/MongoClient.h"
 
 using namespace galay::mongo;
@@ -45,7 +45,7 @@ int main() {
 
 ### 同步 CRUD（example/include/E3-SyncCrud.cc）
 
-```
+```cpp
 #include "galay-mongo/sync/MongoClient.h"
 
 MongoClient session;
@@ -66,7 +66,7 @@ session.deleteOne(cfg.database, "items", filter);
 
 ### 异步 Pipeline（example/include/E4-AsyncPipeline.cc）
 
-```
+```cpp
 Coroutine run(IOScheduler* scheduler, MongoConfig cfg, AsyncMongoConfig async_cfg) {
     AsyncMongoClient client(scheduler, async_cfg);
     co_await client.connect(cfg);
@@ -88,16 +88,33 @@ Coroutine run(IOScheduler* scheduler, MongoConfig cfg, AsyncMongoConfig async_cf
 - `E3-SyncCrud`、`E4-AsyncPipeline`、`E5-AsyncCommandCrud`
 - 源码路径：`example/include/` 与 `example/import/`
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DGALAY_MONGO_BUILD_TESTS=ON/OFF
 -DGALAY_MONGO_BUILD_EXAMPLES=ON/OFF
 -DGALAY_MONGO_BUILD_BENCHMARKS=ON/OFF

@@ -74,7 +74,7 @@ cd service/backend
 # 编译
 mkdir build && cd build
 cmake ..
-make -j$(nproc)
+make -j
 
 # 运行
 ./bin/backend-server -p 8080

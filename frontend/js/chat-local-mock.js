@@ -9,13 +9,13 @@
     const CASES = {
         raw_cmake: {
             streamText:
-                '1. 环境要求：- C++20 编译器（GCC 11+/Clang 14+）- CMake 3.20+ 构建系统2. 安装步骤：git clone https://github.com/galay/galay.git 使用 CMake 构建：cmake -S . -B build cmake --build build -j 3. 编译运行命令：g++ -std=c++20 main.cpp -o demo ./demo',
+                '1. 环境要求：- C++20 编译器（GCC 11+/Clang 14+）- CMake 3.20+ 构建系统2. 安装步骤：git clone https://github.com/galay/galay.git 使用 CMake 构建：cmake -S . -B build cmake --build build --parallel 3. 编译运行命令：g++ -std=c++20 main.cpp -o demo ./demo',
             answer:
-                '## 环境要求\n- C++20 编译器（GCC 11+/Clang 14+）\n- CMake 3.20+ 构建系统\n## 安装步骤\n```bash\ngit clone https://github.com/galay/galay.git\n```\n使用 CMake 构建：\n```bash\ncmake -S . -B build\ncmake --build build -j\n```\n## 编译运行命令\n```bash\ng++ -std=c++20 main.cpp -o demo ./demo\n```',
+                '## 环境要求\n- C++20 编译器（GCC 11+/Clang 14+）\n- CMake 3.20+ 构建系统\n## 安装步骤\n```bash\ngit clone https://github.com/galay/galay.git\n```\n使用 CMake 构建：\n```bash\ncmake -S . -B build\ncmake --build build --parallel\n```\n## 编译运行命令\n```bash\ng++ -std=c++20 main.cpp -o demo ./demo\n```',
         },
         final_cmake: {
             answer:
-                '## 环境要求\n- C++20 编译器（GCC 11+/Clang 14+）\n- CMake 3.20+ 构建系统\n## 安装步骤\n```bash\ngit clone https://github.com/galay/galay.git\n```\n使用 CMake 构建：\n```bash\ncmake -S . -B build\ncmake --build build -j\n```',
+                '## 环境要求\n- C++20 编译器（GCC 11+/Clang 14+）\n- CMake 3.20+ 构建系统\n## 安装步骤\n```bash\ngit clone https://github.com/galay/galay.git\n```\n使用 CMake 构建：\n```bash\ncmake -S . -B build\ncmake --build build --parallel\n```',
         },
         quoted_fence: {
             answer:

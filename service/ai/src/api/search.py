@@ -13,9 +13,11 @@ router = APIRouter()
 async def search(request: SearchRequest):
     """文档搜索接口"""
     from src.app import get_vector_store
+    from src.services.rag_service import RAGService
 
     vs = get_vector_store()
-    results = vs.search_with_score(request.query, k=request.k)
+    rag = RAGService(vs)
+    results = rag.retrieve_with_score(request.query, k=request.k)
 
     items = [
         SearchResult(

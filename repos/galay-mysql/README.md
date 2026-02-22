@@ -19,11 +19,11 @@ galay-mysql 是 Galay 库体系的 MySQL 客户端组件，提供同步/异步�
 
 ### 异步查询（example/include/E1-AsyncQuery.cc）
 
-```
+```cpp
 #include "galay-mysql/async/AsyncMysqlClient.h"
-#include 
-#include 
-#include 
+#include
+#include
+#include
 
 using namespace galay::mysql;
 using namespace galay::kernel;
@@ -51,7 +51,7 @@ Coroutine run(IOScheduler* scheduler) {
 
 ### 同步预处理与事务（example/include/E4-SyncPreparedTx.cc）
 
-```
+```cpp
 #include "galay-mysql/sync/MysqlClient.h"
 
 MysqlClient session;
@@ -75,16 +75,33 @@ session.close();
 - `E4-SyncPreparedTx` — 预处理 + 事务
 - 源码路径：`example/include/` 与 `example/import/`
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DGALAY_MYSQL_BUILD_TESTS=ON/OFF
 -DGALAY_MYSQL_BUILD_EXAMPLES=ON/OFF
 -DGALAY_MYSQL_BUILD_SHARED_LIBS=ON/OFF

@@ -25,7 +25,12 @@ class VectorStoreManager:
     # 生命周期
     # ------------------------------------------------------------------
     def initialize(self, force_rebuild: bool = False) -> None:
-        if force_rebuild or not self._exists():
+        if force_rebuild:
+            logger.info("Force rebuild enabled, removing existing vector store first...")
+            if Path(self._persist_dir).exists():
+                shutil.rmtree(self._persist_dir)
+            self._build()
+        elif not self._exists():
             logger.info("Building vector store from documents...")
             self._build()
         else:

@@ -19,7 +19,7 @@ galay-kernel 是 Galay 库体系的运行时基座，提供协程调度、事件
 
 ### 最小示例（example/include/E4-CoroutineBasic.cc）
 
-```
+```cpp
 #include "galay-kernel/kernel/Coroutine.h"
 #include "galay-kernel/kernel/ComputeScheduler.h"
 
@@ -47,16 +47,33 @@ int main() {
 - `E4-CoroutineBasic` — `example/include/E4-CoroutineBasic.cc`
 - `E5-UdpEcho` — `example/include/E5-UdpEcho.cc`
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DBUILD_TESTS=ON/OFF
 -DBUILD_BENCHMARKS=ON/OFF
 -DBUILD_EXAMPLES=ON/OFF

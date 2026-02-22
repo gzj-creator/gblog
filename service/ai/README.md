@@ -154,6 +154,10 @@ make test
 
 # 本地格式回归（不依赖 AI 网络调用）
 make verify-format
+
+# 统一仓库文档风格（按 docs/doc_style_prompt.md）
+make apply-doc-style
+make verify-doc-style
 ```
 
 ### 6. 知识库自动重建与评测
@@ -306,6 +310,9 @@ lifespan 启动
 | `OPENAI_API_BASE` | `https://api.openai.com/v1` | API 基础地址 |
 | `MODEL_NAME` | `gpt-4-turbo-preview` | LLM 模型 |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding 模型 |
+| `EMBEDDING_BATCH_SIZE` | `32` | Embedding 批量大小（兼容部分第三方 OpenAI 接口） |
+| `EMBEDDING_REQUEST_TIMEOUT` | `120` | Embedding 请求超时（秒） |
+| `EMBEDDING_MAX_RETRIES` | `6` | Embedding 失败重试次数 |
 | `TEMPERATURE` | `0.7` | 生成温度 |
 | `VECTOR_STORE_PATH` | `./vector_store` | 向量存储路径 |
 | `CHUNK_SIZE` | `1000` | 文本分割大小 |
@@ -343,5 +350,6 @@ make docker-down
 | `OPENAI_API_KEY is required` | 在 `.env` 中配置有效的 API Key |
 | `No valid documentation paths found` | 检查 `.env` 中的文档路径是否存在 |
 | `Vector store not initialized` | 运行 `make build-index` 构建索引 |
+| `TypeError: 'NoneType' object is not iterable`（embedding） | 降低 `EMBEDDING_BATCH_SIZE`（如 `16`），并重跑 `make build-index-force` |
 | 搜索结果不相关 | 尝试 `make build-index-force` 重建索引 |
 | 前端无法连接 | 确认服务运行在 `localhost:8000`，检查 CORS 配置 |

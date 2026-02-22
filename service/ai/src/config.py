@@ -15,6 +15,9 @@ class Settings(BaseSettings):
 
     # Embedding
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_BATCH_SIZE: int = 32
+    EMBEDDING_REQUEST_TIMEOUT: int = 120
+    EMBEDDING_MAX_RETRIES: int = 6
 
     # Vector Store
     VECTOR_STORE_PATH: str = "./vector_store"

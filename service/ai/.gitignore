@@ -7,6 +7,7 @@ venv/
 data/
 logs/
 *.log
+vector_store/
 .DS_Store
 *.egg-info/
 dist/

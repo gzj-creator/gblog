@@ -34,7 +34,7 @@
 # 或手动构建
 mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DGALAY_KERNEL_BACKEND=epoll
-make -j$(nproc)
+make -j
 ```
 
 ## 运行

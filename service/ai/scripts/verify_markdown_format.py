@@ -59,9 +59,26 @@ def run_synthetic_cases() -> None:
                 "must_contain_1": "## 环境要求",
                 "must_contain_2": "## 安装步骤",
                 "must_contain_3": "使用 CMake 构建：",
-                "must_contain_4": "## 编译运行命令",
-                "must_contain_5": "```bash\ng++ -std=c++20 main.cpp -o demo ./demo\n```",
+                "must_contain_4": "cmake --build build --parallel",
+                "must_contain_5": "## 编译运行命令",
+                "must_contain_6": "```bash\ng++ -std=c++20 main.cpp -o demo ./demo\n```",
                 "must_not_contain_1": "```bash\nGCC 11+/Clang 14+）",
+            },
+        ),
+        (
+            "portable_parallel",
+            (
+                "```bash\n"
+                "cmake --build build -j\"$(nproc)\"\n"
+                "make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)\n"
+                "```\n"
+            ),
+            {
+                "must_contain_1": "cmake --build build --parallel",
+                "must_contain_2": "make -j",
+                "must_not_contain_1": "$(nproc",
+                "must_not_contain_2": "sysctl -n hw.ncpu",
+                "must_not_contain_3": " -j\"$(nproc)\"",
             },
         ),
         (

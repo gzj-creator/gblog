@@ -2,6 +2,23 @@
 
 > 本文档基于 `galay-*` 各仓库文档进行汇聚、去重与结构化重排，面向“选型 + 落地 + 运维”场景。
 
+## 0. 环境安装（macOS / Linux）
+
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据具体组件依赖补充安装（openssl、spdlog、simdjson、liburing 等）
+```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据具体组件依赖补充安装（libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
 ## 1. 生态总览
 
 Galay 是以 C++23 协程为中心的网络与服务组件体系，核心价值是：

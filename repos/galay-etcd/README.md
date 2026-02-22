@@ -19,7 +19,7 @@ galay-etcd 是 Galay 库体系的 etcd v3 客户端组件，提供 KV、租约�
 
 ### 最小 Smoke 流程（test/T1-EtcdSmoke.cc）
 
-```
+```cpp
 #include "galay-etcd/sync/EtcdClient.h"
 
 using namespace galay::etcd;
@@ -41,7 +41,7 @@ Coroutine run(IOScheduler* scheduler) {
 
 ### 前缀与 Pipeline（API 对齐）
 
-```
+```cpp
 // 前缀查询：get(key, prefix=true)
 co_await session.get("/services/app/", true);
 
@@ -63,11 +63,28 @@ co_await session.pipeline(std::move(ops));
 - `T3-EtcdPipeline` — txn success ops 管道
 - `B1-EtcdKvBenchmark` — KV 压测
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 
 # 功能测试
 ./build/test/T1-EtcdSmoke http://127.0.0.1:2379
@@ -77,7 +94,7 @@ cmake --build build -j
 
 ### 构建选项
 
-```
+```text
 -DGALAY_ETCD_BUILD_TESTS=ON/OFF
 -DGALAY_ETCD_BUILD_BENCHMARKS=ON/OFF
 -DGALAY_ETCD_BUILD_SHARED_LIBS=ON/OFF

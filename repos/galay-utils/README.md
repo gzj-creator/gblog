@@ -31,8 +31,8 @@ ConsistentHashconsistent_hash/ConsistentHash.hpp一致性哈希路由
 
 ### StringUtils
 
-```
-#include 
+```cpp
+#include
 
 using namespace galay::utils;
 
@@ -61,8 +61,8 @@ auto replaced = StringUtils::replace("foo bar foo", "foo", "baz");
 
 ### ThreadPool
 
-```
-#include 
+```cpp
+#include
 
 ThreadPool pool(4);  // 4 个工作线程
 
@@ -76,7 +76,7 @@ int result = future.get();  // 阻塞等待结果
 
 // 批量提交
 std::vector> futures;
-for (int i = 0; i 
+for (int i = 0; i
 
 // 每秒 100 个令牌，桶容量 200（允许突发）
 TokenBucketLimiter limiter(100, 200);
@@ -98,8 +98,8 @@ Coroutine throttle() {
 
 ### CircuitBreaker（熔断器）
 
-```
-#include 
+```cpp
+#include
 
 CircuitBreakerConfig config;
 config.failureThreshold = 5;
@@ -122,8 +122,8 @@ if (!result) {
 
 ### LoadBalancer
 
-```
-#include 
+```cpp
+#include
 
 // 轮询
 RoundRobinLoadBalancer rr({
@@ -143,11 +143,28 @@ auto weighted = wrr.select();
 - 示例代码可参考仓库 README 的“基本使用”片段
 - 各模块文档位于 `docs/*.md`（如 `docs/string.md`、`docs/thread.md`）
 
-## 构建
+## 安装与构建
+
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
+```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
 
 galay-utils 是纯头文件库，无需编译。直接 include 即可使用：
 
-```
+```cmake
 // CMakeLists.txt
 find_package(galay-utils REQUIRED)
 target_link_libraries(myapp PRIVATE galay::galay-utils)
@@ -155,7 +172,7 @@ target_link_libraries(myapp PRIVATE galay::galay-utils)
 
 ### 构建选项
 
-```
+```text
 -DBUILD_TESTS=ON/OFF
 -DBUILD_MODULE_TESTS=ON/OFF
 ```

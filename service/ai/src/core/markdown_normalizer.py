@@ -252,6 +252,7 @@ def _normalize_plain_segment(segment: str, *, target: str) -> str:
     if target == "answer":
         text = _normalize_answer_section_lines(text)
 
+    text = _normalize_portable_commands(text)
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"[ \t]*\n[ \t]*", "\n", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
@@ -425,6 +426,7 @@ def _sanitize_fenced_block(lines: List[str], language: str) -> Tuple[List[str], 
         prose_lines.extend(line for line in code_lines if line.strip())
         return prose_lines, []
 
+    code_lines = [_normalize_portable_command_line(line) for line in code_lines]
     return prose_lines, code_lines
 
 
@@ -471,7 +473,9 @@ def _is_explanatory_line(line: str) -> bool:
 
 
 def _drop_empty_fences(text: str) -> str:
-    return re.sub(r"(?ms)^```[A-Za-z0-9_-]*\n\s*```[ \t]*\n?", "", text)
+    # Remove truly empty fenced blocks only, and avoid matching the prefix of
+    # a following opening fence like ```bash.
+    return re.sub(r"(?m)^```[A-Za-z0-9_-]*\n[ \t]*```[ \t]*(?:\n|$)", "", text)
 
 
 def _cleanup_whitespace(text: str) -> str:
@@ -664,3 +668,76 @@ def _split_compact_code_line(line: str) -> List[str]:
         normalized,
     )
     return [part.strip() for part in normalized.split("\n") if part.strip()]
+
+
+def _normalize_portable_commands(text: str) -> str:
+    return "\n".join(_normalize_portable_command_line(line) for line in text.split("\n"))
+
+
+def _normalize_portable_command_line(line: str) -> str:
+    raw = str(line or "")
+    stripped = raw.strip()
+    if not stripped:
+        return raw
+
+    leading_ws_match = re.match(r"^\s*", raw)
+    leading_ws = leading_ws_match.group(0) if leading_ws_match else ""
+
+    has_prompt = False
+    command = stripped
+    if command.startswith("$"):
+        has_prompt = True
+        command = command[1:].lstrip()
+
+    # Keep chained commands untouched to avoid rewriting the wrong segment.
+    # Allow command substitutions like $(nproc ... || ...), which are safe to normalize.
+    if ("&&" in command or "||" in command or ";" in command) and "$(" not in command:
+        return raw
+
+    normalized_command = command
+    normalized_command = _normalize_make_parallel_flag(normalized_command)
+    normalized_command = _normalize_cmake_build_parallel_flag(normalized_command)
+
+    if normalized_command == command:
+        return raw
+
+    if has_prompt:
+        normalized_command = f"$ {normalized_command}"
+
+    return f"{leading_ws}{normalized_command}".rstrip()
+
+
+def _normalize_make_parallel_flag(command: str) -> str:
+    if not re.match(r"^make(?:\s|$)", command, flags=re.IGNORECASE):
+        return command
+
+    return re.sub(
+        r"(?<!\S)-j(?:\s*(?:\"[^\"]*\"|'[^']*'|\$\([^)]+\)|\d+))?",
+        "-j",
+        command,
+        count=1,
+    )
+
+
+def _normalize_cmake_build_parallel_flag(command: str) -> str:
+    if not re.match(r"^cmake(?:\s|$)", command, flags=re.IGNORECASE):
+        return command
+    if re.search(r"(?<!\S)--build(?:\s|$)", command, flags=re.IGNORECASE) is None:
+        return command
+
+    cleaned = re.sub(
+        r"(?<!\S)--parallel(?:\s+(?:\"[^\"]*\"|'[^']*'|\$\([^)]+\)|\d+))?",
+        "",
+        command,
+        flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(
+        r"(?<!\S)-j(?:\s*(?:\"[^\"]*\"|'[^']*'|\$\([^)]+\)|\d+))?",
+        "",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+
+    if re.search(r"(?<!\S)--parallel(?=\s|$)", cleaned, flags=re.IGNORECASE):
+        return cleaned
+    return f"{cleaned} --parallel"

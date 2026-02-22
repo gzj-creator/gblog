@@ -19,9 +19,9 @@ galay-redis 是 Galay 库体系的 Redis 客户端组件，提供协程命令、
 
 ### 最小异步示例（README 快速开始）
 
-```
+```cpp
 #include "galay-redis/async/RedisClient.h"
-#include 
+#include
 
 using namespace galay::redis;
 using namespace galay::kernel;
@@ -43,7 +43,7 @@ Coroutine example(IOScheduler* scheduler) {
 
 ### Pipeline 示例（async/RedisClient.h）
 
-```
+```cpp
 Coroutine pipelineExample(IOScheduler* scheduler) {
     RedisClient client(scheduler);
     co_await client.connect("127.0.0.1", 6379);
@@ -65,16 +65,33 @@ Coroutine pipelineExample(IOScheduler* scheduler) {
 - `test/test_redis_client_benchmark.cc` — 普通/管道压测
 - `test/test_sync.cc`、`test/test_async.cc` — 同步与异步路径
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DGALAY_REDIS_ENABLE_IMPORT_COMPILATION=ON/OFF
 -DGALAY_REDIS_INSTALL_MODULE_INTERFACE=ON/OFF
 ```

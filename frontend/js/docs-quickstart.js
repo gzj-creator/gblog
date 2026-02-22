@@ -14,7 +14,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-kernel',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -23,7 +23,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DENABLE_CPP23_MODULES=ON',
-                'cmake --build build-mod --target galay-kernel-modules -j'
+                'cmake --build build-mod --target galay-kernel-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -53,7 +53,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-ssl',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -62,7 +62,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DBUILD_MODULE_EXAMPLES=ON',
-                'cmake --build build-mod --target galay-ssl-modules -j'
+                'cmake --build build-mod --target galay-ssl-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -88,7 +88,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-http',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -97,7 +97,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DBUILD_MODULE_EXAMPLES=ON',
-                'cmake --build build-mod --target galay-http-modules -j'
+                'cmake --build build-mod --target galay-http-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -124,7 +124,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-rpc',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -133,7 +133,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DBUILD_MODULE_EXAMPLES=ON',
-                'cmake --build build-mod --target galay-rpc-modules -j'
+                'cmake --build build-mod --target galay-rpc-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -159,7 +159,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-redis',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -168,7 +168,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DGALAY_REDIS_ENABLE_IMPORT_COMPILATION=ON',
-                'cmake --build build-mod --target galay-redis-modules -j'
+                'cmake --build build-mod --target galay-redis-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -192,7 +192,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-mysql',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -201,7 +201,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DGALAY_MYSQL_ENABLE_IMPORT_COMPILATION=ON',
-                'cmake --build build-mod --target galay-mysql -j'
+                'cmake --build build-mod --target galay-mysql --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -225,7 +225,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-mongo',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -234,7 +234,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DGALAY_MONGO_ENABLE_IMPORT_COMPILATION=ON',
-                'cmake --build build-mod --target galay-mongo-modules -j'
+                'cmake --build build-mod --target galay-mongo-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -258,7 +258,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-etcd',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -267,7 +267,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DGALAY_ETCD_ENABLE_IMPORT_COMPILATION=ON',
-                'cmake --build build-mod --target galay-etcd -j'
+                'cmake --build build-mod --target galay-etcd --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -298,7 +298,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DBUILD_MODULE_TESTS=ON',
-                'cmake --build build-mod --target galay-utils-modules -j'
+                'cmake --build build-mod --target galay-utils-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',
@@ -322,7 +322,7 @@ const DOCS_QUICKSTART_MAP = {
             'cd galay-mcp',
             'mkdir build && cd build',
             'cmake .. -DCMAKE_BUILD_TYPE=Release',
-            'make -j$(nproc)',
+            'make -j',
             'sudo make install'
         ],
         module: {
@@ -331,7 +331,7 @@ const DOCS_QUICKSTART_MAP = {
                 'cmake -S . -B build-mod -G Ninja \\',
                 '  -DCMAKE_BUILD_TYPE=Release \\',
                 '  -DBUILD_MODULE_EXAMPLES=ON',
-                'cmake --build build-mod --target galay-mcp-modules -j'
+                'cmake --build build-mod --target galay-mcp-modules --parallel'
             ],
             usage: [
                 '#if defined(__cpp_modules) && __cpp_modules >= 201907L',

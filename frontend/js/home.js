@@ -9,7 +9,7 @@ const API_BASE = '/api';
 // Typing Animation
 // ============================================
 const typingTexts = [
-    'make -j$(nproc)',
+    'make -j',
     'echo "build complete"',
     'git clone galay-http',
     'cmake .. && make install',

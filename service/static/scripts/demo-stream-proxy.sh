@@ -112,7 +112,7 @@ if [[ -z "${STATIC_BIN_PATH}" ]]; then
 [demo] static-server binary not found.
 [demo] set STATIC_BIN or build one first, for example:
   cmake -S service/static -B build/static-debug -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/usr/local
-  cmake --build build/static-debug -j4
+  cmake --build build/static-debug --parallel
 EOF
   exit 1
 fi

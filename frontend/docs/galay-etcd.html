@@ -132,7 +132,7 @@ co_await session.pipeline(std::move(ops));</code></pre>
 
 <h2>构建</h2>
 <pre><code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 
 # 功能测试
 ./build/test/T1-EtcdSmoke http://127.0.0.1:2379

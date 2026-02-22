@@ -19,7 +19,7 @@ galay-mcp 是 Galay 库体系的 MCP 接入组件，支持 stdio/HTTP 传输与�
 
 ### Stdio 工具注册（example/common/E1-BasicStdioUsageMain.inc）
 
-```
+```cpp
 #include "galay-mcp/server/McpStdioServer.h"
 #include "galay-mcp/common/McpSchemaBuilder.h"
 
@@ -51,7 +51,7 @@ server.run();
 
 ### HTTP 传输（example/common/E2-BasicHttpUsageMain.inc）
 
-```
+```cpp
 #include "galay-mcp/server/McpHttpServer.h"
 #include "galay-mcp/client/McpHttpClient.h"
 
@@ -70,16 +70,33 @@ server.start();
 - `E2-BasicHttpUsage` — `example/include/E2-BasicHttpUsage.cc`
 - import 对应：`example/import/` 同名示例
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DBUILD_TESTS=ON/OFF
 -DBUILD_BENCHMARKS=ON/OFF
 -DBUILD_EXAMPLES=ON/OFF

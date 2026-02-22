@@ -19,24 +19,24 @@ galay-ssl 是 Galay 库体系的 TLS 传输层，提供异步握手、加密收�
 
 ### 最小 TLS Echo 服务端（examples/include/E1-SslEchoServer.cc）
 
-```
+```cpp
 #include "galay-ssl/async/SslSocket.h"
 #include "galay-ssl/ssl/SslContext.h"
-#include 
-#include 
-#include 
-#include 
-#include 
-#include 
+#include
+#include
+#include
+#include
+#include
+#include
 
 #ifdef USE_KQUEUE
-#include 
+#include
 using IOSchedulerType = galay::kernel::KqueueScheduler;
 #elif defined(USE_EPOLL)
-#include 
+#include
 using IOSchedulerType = galay::kernel::EpollScheduler;
 #elif defined(USE_IOURING)
-#include 
+#include
 using IOSchedulerType = galay::kernel::IOUringScheduler;
 #endif
 
@@ -113,16 +113,33 @@ int main(int argc, char* argv[]) {
 - `E1-SslEchoServer-Import` — `examples/import/E1-SslEchoServer.cc`
 - `E2-SslClient-Import` — `examples/import/E2-SslClient.cc`
 
-## 构建
+## 安装与构建
 
+### macOS
+
+```bash
+brew install cmake ninja pkg-config
+# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
 ```
+
+### Linux (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install -y build-essential cmake ninja-build pkg-config
+# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+```
+
+### 通用构建
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build -j
+cmake --build build --parallel
 ```
 
 ### 构建选项
 
-```
+```text
 -DBUILD_TESTS=ON/OFF
 -DBUILD_BENCHMARKS=ON/OFF
 -DBUILD_EXAMPLES=ON/OFF

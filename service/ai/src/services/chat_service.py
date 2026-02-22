@@ -25,6 +25,19 @@ _FORBIDDEN_SCHEDULER_APIS = (
     re.compile(r"\bioContext\b"),
     re.compile(r"\bIoContext\b"),
 )
+_TASK_RETURN_ANNOTATION_RE = re.compile(
+    r"->\s*(?:galay::kernel::)?Task\s*<\s*[^>]+\s*>",
+    re.IGNORECASE,
+)
+_TASK_VOID_RE = re.compile(
+    r"\b(?:galay::kernel::)?Task\s*<\s*void\s*>",
+    re.IGNORECASE,
+)
+_EMPTY_CAPTURE_COROUTINE_LAMBDA_START_RE = re.compile(
+    r"^(?P<indent>\s*)auto\s+(?P<name>[A-Za-z_]\w*)\s*=\s*\[\s*\]\s*"
+    r"\((?P<params>[^)]*)\)\s*(?:->\s*[^{]+)?\s*\{\s*$"
+)
+_COROUTINE_LAMBDA_END_RE = re.compile(r"^\s*};\s*$")
 
 
 class ChatService:
@@ -283,36 +296,105 @@ def _normalize_answer_text(raw: str) -> str:
         return ""
 
     normalized = normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
-    return _enforce_scheduler_api_consistency(normalized)
+    return _enforce_framework_output_consistency(normalized)
 
 
-def _enforce_scheduler_api_consistency(text: str) -> str:
+def _enforce_framework_output_consistency(text: str) -> str:
     if not text:
         return ""
 
-    if not any(pattern.search(text) for pattern in _FORBIDDEN_SCHEDULER_APIS):
-        return text
-
     fixed = text
-    fixed = re.sub(
-        r"\b(?:IoContext|IOContext)\s*::\s*GetInstance\s*\(\s*\)",
-        "runtime.getNextIOScheduler()",
-        fixed,
-        flags=re.IGNORECASE,
-    )
-    fixed = re.sub(r"\bioContext\b", "ioScheduler", fixed)
-    fixed = re.sub(r"\bIoContext\b", "IOScheduler", fixed)
+    changed = False
+    notes: List[str] = []
 
-    note = (
-        "说明：Galay 当前没有 `IoContext` 单例 API，请使用 `Runtime` 获取调度器："
-        "`runtime.getNextIOScheduler()` / `runtime.getNextComputeScheduler()`。"
-    )
-    if note not in fixed:
-        fixed = f"{fixed.rstrip()}\n\n{note}"
+    if any(pattern.search(fixed) for pattern in _FORBIDDEN_SCHEDULER_APIS):
+        fixed = re.sub(
+            r"\b(?:IoContext|IOContext)\s*::\s*GetInstance\s*\(\s*\)",
+            "runtime.getNextIOScheduler()",
+            fixed,
+            flags=re.IGNORECASE,
+        )
+        fixed = re.sub(r"\bioContext\b", "ioScheduler", fixed)
+        fixed = re.sub(r"\bIoContext\b", "IOScheduler", fixed)
+        changed = True
+        notes.append(
+            "说明：Galay 当前没有 `IoContext` 单例 API，请使用 `Runtime` 获取调度器："
+            "`runtime.getNextIOScheduler()` / `runtime.getNextComputeScheduler()`。"
+        )
 
-    logger.warning("Detected forbidden IoContext API in model output, auto-corrected")
+    if _TASK_RETURN_ANNOTATION_RE.search(fixed) or _TASK_VOID_RE.search(fixed):
+        fixed = _TASK_RETURN_ANNOTATION_RE.sub("-> Coroutine", fixed)
+        fixed = _TASK_VOID_RE.sub("Coroutine", fixed)
+        changed = True
+        notes.append(
+            "说明：Galay 示例中的协程返回类型统一使用 `Coroutine`，不要使用 `Task<void>` / `Task<T>`。"
+        )
+
+    fixed, lambda_rewritten = _rewrite_empty_capture_coroutine_lambdas(fixed)
+    if lambda_rewritten:
+        changed = True
+        notes.append(
+            "说明：协程逻辑不要使用 lambda（避免生命周期问题），请使用具名 `Coroutine` 函数。"
+        )
+
+    for note in notes:
+        if note not in fixed:
+            fixed = f"{fixed.rstrip()}\n\n{note}"
+
+    if changed:
+        logger.warning("Detected forbidden coroutine/API style in model output, auto-corrected")
+
     return fixed
 
+
+def _rewrite_empty_capture_coroutine_lambdas(text: str) -> tuple[str, bool]:
+    lines = text.split("\n")
+    output: List[str] = []
+    idx = 0
+    rewritten = False
+
+    while idx < len(lines):
+        line = lines[idx]
+        match = _EMPTY_CAPTURE_COROUTINE_LAMBDA_START_RE.match(line)
+        if not match:
+            output.append(line)
+            idx += 1
+            continue
+
+        end = None
+        has_coroutine_ops = False
+        scan_limit = min(len(lines), idx + 240)
+        cursor = idx + 1
+        while cursor < scan_limit:
+            cur_line = lines[cursor]
+            if "co_await" in cur_line or "co_return" in cur_line:
+                has_coroutine_ops = True
+            if _COROUTINE_LAMBDA_END_RE.match(cur_line):
+                end = cursor
+                break
+            cursor += 1
+
+        if end is None or not has_coroutine_ops:
+            output.append(line)
+            idx += 1
+            continue
+
+        indent = match.group("indent")
+        name = match.group("name")
+        params = match.group("params").strip() or "/* params */"
+        runner_name = f"{name}_coroutine_runner"
+        body_lines = lines[idx + 1 : end]
+
+        output.append(f"{indent}struct {runner_name} {{")
+        output.append(f"{indent}    Coroutine operator()({params}) {{")
+        output.extend(body_lines)
+        output.append(f"{indent}    }}")
+        output.append(f"{indent}}} {name};")
+
+        rewritten = True
+        idx = end + 1
+
+    return "\n".join(output), rewritten
 
 def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:
     if not text:

@@ -7,16 +7,23 @@
 ### macOS
 
 ```bash
-brew install cmake ninja pkg-config
-# 根据具体组件依赖补充安装（openssl、spdlog、simdjson、liburing 等）
+brew install cmake ninja pkg-config openssl spdlog simdjson
 ```
 
 ### Linux (Ubuntu/Debian)
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake ninja-build pkg-config
-# 根据具体组件依赖补充安装（libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+sudo apt install -y build-essential cmake ninja-build pkg-config \
+  libssl-dev libspdlog-dev libsimdjson-dev liburing-dev libaio-dev
+```
+
+### 推荐最小仓库组合（Web/AI 场景）
+
+```bash
+git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-utils.git
+git clone https://github.com/gzj-creator/galay-http.git
 ```
 
 ## 1. 生态总览
@@ -43,7 +50,7 @@ Galay 是以 C++23 协程为中心的网络与服务组件体系，核心价值�
 
 - `galay-kernel`
 - 职责：协程调度、事件循环、异步 IO 后端统一、Awaitable 基础设施
-- 关键词：`Runtime`、`Scheduler`、`Coroutine`
+- 关键词：`Runtime`、`IOScheduler`、`ComputeScheduler`、`Coroutine`
 
 ### 2.2 Transport/Security 层
 

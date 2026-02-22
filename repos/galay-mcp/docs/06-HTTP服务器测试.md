@@ -1,4 +1,4 @@
-# T4-HTTP服务器测试
+# 06-HTTP服务器测试
 
 ## 测试概述
 
@@ -342,7 +342,7 @@ McpHttpServer 通过了所有功能测试，表现稳定可靠。服务器能够
 # 构建项目
 cd build
 cmake ..
-make
+cmake --build . --parallel
 
 # 运行HTTP服务器
 ./bin/T4-HttpServer
@@ -357,7 +357,5 @@ bash scripts/S5-TestHttpServer.sh
 
 ## 相关文档
 
-- [T3-HTTP客户端测试.md](T3-HTTP客户端测试.md) - HTTP客户端测试文档
-- [4-性能测试.md](4-性能测试.md) - 性能测试总览文档
-- [B2-HTTP性能测试.md](B2-HTTP性能测试.md) - HTTP性能测试文档
-- [B3-并发请求压测.md](B3-并发请求压测.md) - 并发请求压测文档
+- [05-HTTP客户端测试.md](05-HTTP客户端测试.md) - HTTP 客户端测试文档
+- [04-性能测试.md](04-性能测试.md) - 性能测试总览文档

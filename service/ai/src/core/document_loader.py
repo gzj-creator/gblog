@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 SKIP_PATTERNS = {"node_modules", ".git", "build", ".cache", "LICENSE", "CHANGELOG"}
 MARKDOWN_SUFFIX = ".md"
+EXCLUDED_DIR_NAMES = {".claude", "todo"}
 
 
 class GalayDocumentLoader:
@@ -144,6 +145,8 @@ class GalayDocumentLoader:
         seen: Set[str] = set()
         for pattern in patterns:
             for file_path in root.rglob(pattern):
+                if self._is_in_excluded_dir(root, file_path):
+                    continue
                 normalized = str(file_path.resolve())
                 if normalized in seen:
                     continue
@@ -154,6 +157,15 @@ class GalayDocumentLoader:
 
         files.sort()
         return files
+
+    @staticmethod
+    def _is_in_excluded_dir(root: Path, file_path: Path) -> bool:
+        try:
+            rel_parts = file_path.relative_to(root).parts[:-1]
+        except ValueError:
+            rel_parts = file_path.parts[:-1]
+        lowered = {part.lower() for part in rel_parts}
+        return any(name in lowered for name in EXCLUDED_DIR_NAMES)
 
     def _is_indexable_file(self, file_path: Path) -> bool:
         if not file_path.is_file():

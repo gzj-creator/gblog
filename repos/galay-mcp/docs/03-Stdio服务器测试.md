@@ -1,4 +1,4 @@
-# T2-Stdio服务器测试
+# 03-Stdio服务器测试
 
 ## 测试概述
 
@@ -200,7 +200,7 @@ McpStdioServer 通过了所有功能测试，表现稳定可靠。服务器能�
 # 构建项目
 cd build
 cmake ..
-make
+cmake --build . --parallel
 
 # 运行服务器测试
 ./bin/T2-StdioServer
@@ -212,5 +212,5 @@ bash scripts/S2-Run.sh
 
 ## 相关文档
 
-- [T1-标准输入输出MCP测试.md](T1-标准输入输出MCP测试.md) - 客户端测试文档
-- [1-McpSchemaBuilder使用指南.md](1-McpSchemaBuilder使用指南.md) - Schema构建器使用指南
+- [02-标准输入输出MCP测试.md](02-标准输入输出MCP测试.md) - Stdio 基础功能测试
+- [04-性能测试.md](04-性能测试.md) - 性能测试总览

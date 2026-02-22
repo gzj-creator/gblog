@@ -1,122 +1,217 @@
-# galay-rpc 使用文档
+# Galay-RPC
 
-> Generated from `/Users/gongzhijie/Desktop/projects/git/gblob/service/blog/frontend/docs/galay-rpc.html` for AI vector indexing.
+高性能 **C++23** 协程 RPC 框架，构建于 [galay-kernel](https://github.com/gzj-creator/galay-kernel) 异步运行时之上。
 
-## 概览
+## 特性
 
-galay-rpc 是 Galay 库体系的服务通信组件，提供 unary/stream 调用模型与协程化客户端/服务端接口。
+- C++23 协程：统一 `co_await` 异步调用模型
+- C++23 模块：支持 `export module` / `import` 使用方式
+- 四种 RPC 模式：`unary` / `client_stream` / `server_stream` / `bidi`
+- 真实流协议：支持 `STREAM_INIT` / `STREAM_DATA` / `STREAM_END` 生命周期
+- 高效 IO：`RingBuffer + readv/writev`，支持 pipeline 与窗口化收发
+- 服务发现：基于 C++23 Concept 约束的可扩展注册中心接口
+- 工程完整：内置 `example/`、`test/`、`benchmark/`
 
-它负责消息传输、超时与连接管理，服务治理策略可按业务场景扩展。
+## 文档导航
 
-## 架构
+建议从 `docs/03-使用指南.md` 开始：
 
-- **RpcService** — 以服务名+方法名注册处理器，统一四种调用模式
-- **RpcServer** — 负责连接管理、请求分发与响应回写
-- **RpcClient** — 提供 unary / stream 调用接口与超时控制
-- **ServiceDiscovery** — 注册发现抽象（内置本地实现与 Concept 约束）
+1. [架构设计](docs/01-架构设计.md)
+2. [API参考](docs/02-API参考.md)
+3. [使用指南](docs/03-使用指南.md)
+4. [性能测试](docs/04-性能测试.md)
 
-## 核心 API
+## 构建要求
 
-### 服务注册（example/include/E1-EchoServer.cpp）
+- CMake 3.16+
+- C++23 编译器（GCC 11+ / Clang 14+ / AppleClang 15+）
+- `spdlog`
+- Galay 内部依赖（统一联调推荐）：
+  - `galay-kernel`（构建必需）
+  - `galay-utils`（推荐）
+  - `galay-http`（推荐）
+
+## 依赖安装（macOS / Homebrew）
+
+```bash
+brew install cmake spdlog
+```
+
+## 依赖安装（Ubuntu / Debian）
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake g++ libspdlog-dev
+```
+
+## 拉取源码（统一联调推荐）
+
+```bash
+git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-utils.git
+git clone https://github.com/gzj-creator/galay-http.git
+git clone https://github.com/gzj-creator/galay-rpc.git
+```
+
+仅单独构建 `galay-rpc` 时，最小内部依赖为 `galay-kernel`。
+
+## 构建
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --parallel
+```
+
+## 常用 CMake 选项
+
+```cmake
+option(BUILD_TESTS "Build test programs" ON)
+option(BUILD_BENCHMARKS "Build benchmark programs" ON)
+option(BUILD_EXAMPLES "Build example programs" ON)
+option(BUILD_MODULE_EXAMPLES "Build C++23 module(import/export) examples" ON)
+```
+
+> `BUILD_MODULE_EXAMPLES` 需要 CMake `>= 3.28` 且使用 `Ninja`/`Visual Studio` 生成器。
+> 若使用 `Unix Makefiles`，该选项会自动关闭。
+
+## 快速示例
+
+### Echo（RPC 四模式）
+
+```bash
+# 终端 1
+./build/example/E1-EchoServer 9000
+
+# 终端 2
+./build/example/E2-EchoClient 127.0.0.1 9000
+```
+
+### 真实 Stream（STREAM_* 协议）
+
+```bash
+# 终端 1
+./build/example/E3-StreamServer 9100 1 131072
+
+# 终端 2
+./build/example/E4-StreamClient 127.0.0.1 9100 200 64
+```
+
+### C++23 模块化导入示例（import 版本）
 
 ```cpp
-#include "galay-rpc/kernel/RpcServer.h"
-#include "galay-rpc/kernel/RpcService.h"
-
-using namespace galay::rpc;
-
-class EchoService : public RpcService {
-public:
-    EchoService() : RpcService("EchoService") {
-        registerMethod("echo", &EchoService::echo);
-        registerClientStreamingMethod("echo", &EchoService::echo);
-        registerServerStreamingMethod("echo", &EchoService::echo);
-        registerBidiStreamingMethod("echo", &EchoService::echo);
-    }
-
-    Coroutine echo(RpcContext& ctx) {
-        ctx.setPayload(ctx.request().payloadView());
-        co_return;
-    }
-};
-
-int main() {
-    auto service = std::make_shared();
-    RpcServerConfig config;
-    config.host = "0.0.0.0";
-    config.port = 9000;
-    RpcServer server(config);
-    server.registerService(service);
-    server.start();
-    return 0;
-}
+import galay.rpc;
 ```
-
-### 客户端调用（example/include/E2-EchoClient.cpp）
-
-```cpp
-#include "galay-rpc/kernel/RpcClient.h"
-
-Coroutine runClient() {
-    RpcClient client;
-    co_await client.connect("127.0.0.1", 9000);
-
-    auto unary = co_await client.call("EchoService", "echo", "hello");
-    auto bidi = co_await client.callBidiStreamFrame(
-        "EchoService", "echo", "hello", 5, true);
-
-    co_await client.close();
-}
-```
-
-### 示例入口（与仓库一致）
-
-- `E1/E2` — Echo（四模式：unary/client_stream/server_stream/bidi）
-- `E3/E4` — 真实流式（STREAM_INIT/STREAM_DATA/STREAM_END）
-- 源码路径：`example/include/` 与 `example/import/`
-
-## 安装与构建
-
-### macOS
 
 ```bash
-brew install cmake ninja pkg-config
-# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
+# Echo import 版本
+./build/example/E1-EchoServerImport 9000
+./build/example/E2-EchoClientImport 127.0.0.1 9000
+
+# Stream import 版本
+./build/example/E3-StreamServerImport 9100 1 131072
+./build/example/E4-StreamClientImport 127.0.0.1 9100 200 64
 ```
 
-### Linux (Ubuntu/Debian)
+### 模块支持更新（2026-02）
+
+本次模块接口已统一为：
+
+- `module;`
+- `#include "galay-rpc/module/ModulePrelude.hpp"`
+- `export module galay.rpc;`
+- `export { #include ... }`
+
+对应文件：
+
+- `galay-rpc/module/galay.rpc.cppm`
+- `galay-rpc/module/ModulePrelude.hpp`
+
+推荐构建（Clang 20 + Ninja）：
 
 ```bash
-sudo apt update
-sudo apt install -y build-essential cmake ninja-build pkg-config
-# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+cmake -S . -B build-mod -G Ninja \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@20/bin/clang++
+cmake --build build-mod --target galay-rpc-modules --parallel
 ```
 
-### 通用构建
+## 运行测试与基准
+
+### 测试
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+./build/test/T1-RpcProtocolTest
+
+# 终端 1
+./build/test/T2-RpcServerTest 9750
+
+# 终端 2
+./build/test/T3-RpcClientTest 127.0.0.1 9750
 ```
 
-### 构建选项
+### RPC 压测（请求/响应）
+
+```bash
+# 终端 1
+./build/benchmark/B1-RpcBenchServer 9000
+
+# 终端 2
+./build/benchmark/B2-RpcBenchClient -h 127.0.0.1 -p 9000 -c 200 -d 5 -s 47 -i 0 -l 4 -m unary
+./build/benchmark/B2-RpcBenchClient -h 127.0.0.1 -p 9000 -c 200 -d 5 -s 47 -i 0 -l 4 -m client_stream
+./build/benchmark/B2-RpcBenchClient -h 127.0.0.1 -p 9000 -c 200 -d 5 -s 47 -i 0 -l 4 -m server_stream
+./build/benchmark/B2-RpcBenchClient -h 127.0.0.1 -p 9000 -c 200 -d 5 -s 47 -i 0 -l 4 -m bidi
+```
+
+### 真实 Stream 压测（窗口化）
+
+```bash
+# 终端 1
+./build/benchmark/B4-RpcStreamBenchServer 9100 1 131072
+
+# 终端 2
+./build/benchmark/B5-RpcStreamBenchClient -h 127.0.0.1 -p 9100 -c 100 -d 5 -s 128 -f 16 -w 8 -i 0
+```
+
+`B5-RpcStreamBenchClient` 关键参数：
+
+- `-f`: 每条 stream 的帧数（frames per stream）
+- `-w`: 帧级 pipeline 窗口大小（默认 `1`，推荐压测 `8`）
+
+## 性能数据（摘要）
+
+> 测试环境：Apple M4 / 24GB RAM / macOS 15.7.3 / AppleClang / Release
+
+### 四模式 Echo（47B，200连接，`-i 0`，`-l 4`，5秒）
+
+| 模式 | QPS | 吞吐量 | P99 |
+|------|-----|--------|-----|
+| unary | 345,965 | 31.01 MB/s | 40,811 us |
+| client_stream | 277,020 | 24.83 MB/s | 53,104 us |
+| server_stream | 293,926 | 26.35 MB/s | 50,927 us |
+| bidi | 283,218 | 25.39 MB/s | 71,229 us |
+
+### 真实 Stream（100连接，128B，16帧）
+
+窗口化 `-w` 多轮结果详见 [docs/04-性能测试.md](docs/04-性能测试.md)。
+
+## 项目结构
 
 ```text
--DBUILD_TESTS=ON/OFF
--DBUILD_BENCHMARKS=ON/OFF
--DBUILD_EXAMPLES=ON/OFF
--DBUILD_MODULE_EXAMPLES=ON/OFF
--DGALAY_RPC_INSTALL_MODULE_INTERFACE=ON/OFF
+galay-rpc/
+├── galay-rpc/          # 核心库（header-only）
+│   ├── kernel/         # RpcServer / RpcClient / RpcService / RpcStream / ServiceDiscovery
+│   ├── module/         # C++23 命名模块接口（galay.rpc.cppm）
+│   └── protoc/         # RpcMessage / RpcCodec / RpcError / RpcBase
+├── example/
+│   ├── common/         # 示例公共配置
+│   ├── include/        # include 版本示例（E1~E4）
+│   └── import/         # import 版本示例（E1~E4）
+├── test/               # 测试（T1~T3）
+├── benchmark/          # 基准压测（B1~B5）
+└── docs/               # 设计、API、使用与压测报告
 ```
 
-`BUILD_MODULE_EXAMPLES` 需要 CMake >= 3.28，推荐 Ninja/Visual Studio 生成器。
+## 许可证
 
-## 依赖
-
-C++23 编译器、CMake 3.16+、spdlog、galay-kernel（CMake 中为必需依赖）。
-
-服务发现默认提供本地注册中心；远端注册中心按业务侧扩展接入。
-
-## 项目地址
-
-[https://github.com/gzj-creator/galay-rpc](https://github.com/gzj-creator/galay-rpc)
+MIT License

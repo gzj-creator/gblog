@@ -1,4 +1,4 @@
-# T3-HTTP客户端测试
+# 05-HTTP客户端测试
 
 ## 测试概述
 
@@ -279,7 +279,7 @@ McpHttpClient 通过了所有功能测试，表现稳定可靠。客户端能够
 # 构建项目
 cd build
 cmake ..
-make
+cmake --build . --parallel
 
 # 启动HTTP服务器（终端1）
 ./bin/T4-HttpServer
@@ -294,7 +294,6 @@ bash scripts/S5-TestHttpServer.sh
 
 ## 相关文档
 
-- [T4-HTTP服务器测试.md](T4-HTTP服务器测试.md) - HTTP服务器测试文档
-- [T1-标准输入输出MCP测试.md](T1-标准输入输出MCP测试.md) - Stdio客户端测试文档
-- [4-性能测试.md](4-性能测试.md) - 性能测试总览文档
-- [B2-HTTP性能测试.md](B2-HTTP性能测试.md) - HTTP性能测试文档
+- [06-HTTP服务器测试.md](06-HTTP服务器测试.md) - HTTP 服务器测试文档
+- [02-标准输入输出MCP测试.md](02-标准输入输出MCP测试.md) - Stdio 基础测试文档
+- [04-性能测试.md](04-性能测试.md) - 性能测试总览文档

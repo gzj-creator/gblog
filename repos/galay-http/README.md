@@ -1,110 +1,220 @@
-# galay-http 使用文档
+# Galay-HTTP
 
-> Generated from `/Users/gongzhijie/Desktop/projects/git/gblob/service/blog/frontend/docs/galay-http.html` for AI vector indexing.
+高性能 **C++23** 协程 HTTP/WebSocket/HTTP2 库，构建于 `galay-kernel` 之上。
 
-## 概览
+## 特性
 
-galay-http 是 Galay 库体系的 HTTP 协议实现，覆盖 HTTP/1.1、HTTP/2(h2c)、WebSocket、路由与静态文件。
+- C++23 协程异步模型：统一 `co_await` 风格
+- HTTP/1.1：客户端、服务端、Router、静态文件挂载
+- WebSocket：`ws` / `wss`
+- HTTP/2：`h2c`（cleartext）
+- TLS：`https` / `wss`（启用 `GALAY_HTTP_ENABLE_SSL`）
+- C++23 命名模块：`galay.http` / `galay.http2` / `galay.websocket`
 
-它关注协议编解码与连接处理效率，鉴权、业务模型和领域逻辑由应用层实现。
+## 文档导航
 
-## 架构
+建议从 `docs/3-使用指南.md` 开始：
 
-- **HttpServer + HttpRouter** — 服务端监听、路由分发与处理器执行
-- **HttpClient + HttpSession** — 协程客户端连接与请求收发
-- **协议层** — HTTP/1.1、HTTP/2（h2c）与 WebSocket 能力
-- **静态资源** — `mount` 方式挂载目录，可结合缓存协商能力
+1. [架构设计](docs/1-架构设计.md)
+2. [API参考](docs/2-API参考.md)
+3. [使用指南](docs/3-使用指南.md)
+4. [性能测试](docs/04性能测试.md)
 
-## 核心 API
+原先分散的 `B*.md` 说明已合并为单一性能测试文档，减少文档文件数量。
 
-### 最小服务端（example/include/E1-EchoServer.cpp）
+## 构建要求
+
+- CMake 3.22+
+- C++23 编译器（GCC 11+ / Clang 14+ / AppleClang 15+）
+- `spdlog`
+- `galay-kernel`
+- 可选：`galay-ssl` + OpenSSL（启用 TLS 时）
+
+## 依赖安装（macOS / Homebrew）
+
+```bash
+brew install cmake spdlog
+# 仅在开启 TLS 时需要
+brew install openssl
+```
+
+## 依赖安装（Ubuntu / Debian）
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake g++ libspdlog-dev
+# 仅在开启 TLS 时需要
+sudo apt-get install -y libssl-dev
+```
+
+## 拉取源码（统一联调推荐）
+
+```bash
+git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-http.git
+# 可选：启用 TLS 时一并拉取
+git clone https://github.com/gzj-creator/galay-ssl.git
+```
+
+## 构建
+
+```bash
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . --parallel
+```
+
+## 常用 CMake 选项
+
+```cmake
+option(GALAY_HTTP_ENABLE_SSL "Enable SSL/TLS support (requires galay-ssl)" OFF)
+option(BUILD_MODULE_EXAMPLES "Build C++23 module(import/export) support target" ON)
+```
+
+> `BUILD_MODULE_EXAMPLES` 需要 CMake `>= 3.28` 且推荐 `Ninja`/`Visual Studio` 生成器。  
+> 当前 AppleClang 环境会自动关闭模块目标，避免构建失败。
+
+## 模块接口
+
+项目提供 3 个命名模块接口文件：
+
+- `galay-http/module/galay.http.cppm`
+- `galay-http/module/galay.http2.cppm`
+- `galay-http/module/galay.websocket.cppm`
+
+`import` 示例：
 
 ```cpp
-#include "galay-http/kernel/http/HttpServer.h"
-#include "galay-http/kernel/http/HttpRouter.h"
-#include "galay-http/utils/Http1_1ResponseBuilder.h"
-
-using namespace galay::http;
-
-Coroutine echoHandler(HttpConn& conn, HttpRequest req) {
-    auto response = Http1_1ResponseBuilder::ok()
-        .text("Echo: " + req.getBodyStr())
-        .build();
-    auto writer = conn.getWriter();
-    while (true) {
-        auto result = co_await writer.sendResponse(response);
-        if (!result || result.value()) break;
-    }
-    co_return;
-}
-
-int main() {
-    HttpRouter router;
-    router.addHandler("/echo", echoHandler);
-    router.mount("/static", "./html");
-
-    HttpServerConfig config;
-    config.host = "0.0.0.0";
-    config.port = 8080;
-
-    HttpServer server(config);
-    server.start(std::move(router));
-    return 0;
-}
+import galay.http;
+import galay.http2;
+import galay.websocket;
 ```
 
-### 示例入口（与仓库一致）
+### 模块支持更新（2026-02）
 
-- `E1/E2` — HTTP Echo（`example/include/E1-EchoServer.cpp`、`E2-EchoClient.cpp`）
-- `E3/E4` — WebSocket Echo
-- `E5/E6` — HTTPS
-- `E7/E8` — WSS
-- `E9/E10` — H2c Echo
-- `E11` — 静态文件服务
-- `E12` — HTTP 反向代理
+本次模块接口已统一为：
 
-## 安装与构建
+- `module;`
+- `#include "galay-http/module/ModulePrelude.hpp"`
+- `export module ...;`
+- `export { #include ... }`
 
-### macOS
+对应文件：
+
+- `galay-http/module/galay.http.cppm`
+- `galay-http/module/galay.http2.cppm`
+- `galay-http/module/galay.websocket.cppm`
+- `galay-http/module/ModulePrelude.hpp`
+
+推荐构建（Clang 20 + Ninja）：
 
 ```bash
-brew install cmake ninja pkg-config
-# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
+cmake -S . -B build-mod -G Ninja \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@20/bin/clang++ \
+  -DGALAY_HTTP_ENABLE_SSL=OFF
+cmake --build build-mod --target galay-http-modules --parallel
 ```
 
-### Linux (Ubuntu/Debian)
+## Example（精简）
+
+只保留核心示例：协议 Echo + 静态服务器 + Proxy。
+
+### Echo 示例
+
+- `E1-EchoServer` / `E2-EchoClient`：HTTP Echo
+- `E3-WebsocketServer` / `E4-WebsocketClient`：WebSocket Echo
+- `E5-HttpsServer` / `E6-HttpsClient`：HTTPS Echo（SSL）
+- `E7-WssServer` / `E8-WssClient`：WSS Echo（SSL）
+- `E9-H2cEchoServer` / `E10-H2cEchoClient`：H2c Echo
+
+### 其他核心示例
+
+- `E11-StaticServer`：静态文件服务器
+- `E12-HttpProxy`：HTTP 反向代理（支持和 `mount` 集成）
+
+## 快速运行
+
+### HTTP Echo
 
 ```bash
-sudo apt update
-sudo apt install -y build-essential cmake ninja-build pkg-config
-# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+# 终端 1
+./build/example/E1-EchoServer 8080
+
+# 终端 2
+./build/example/E2-EchoClient http://127.0.0.1:8080/echo "hello"
 ```
 
-### 通用构建
+### WebSocket Echo
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+# 终端 1
+./build/example/E3-WebsocketServer
+
+# 终端 2
+./build/example/E4-WebsocketClient ws://127.0.0.1:8080/ws
 ```
 
-### 构建选项
+### H2c Echo
+
+```bash
+# 终端 1
+./build/example/E9-H2cEchoServer 9080
+
+# 终端 2
+./build/example/E10-H2cEchoClient 127.0.0.1 9080
+```
+
+### 静态文件服务
+
+```bash
+./build/example/E11-StaticServer 8090 ./html
+# 打开 http://127.0.0.1:8090/
+```
+
+### 反向代理
+
+```bash
+# upstream
+./build/example/E1-EchoServer 8080
+
+# proxy + mount (listen=8081, upstream=127.0.0.1:8080, /static -> ./html)
+./build/example/E12-HttpProxy 8081 127.0.0.1 8080 /static ./html dynamic
+
+# request through proxy (falls back to upstream)
+curl -X POST http://127.0.0.1:8081/echo -d "via proxy"
+
+# request local static file (served by mount, not proxied)
+curl http://127.0.0.1:8081/static/ResumeDownload.html
+```
+
+参数说明（`E12-HttpProxy`）：
 
 ```text
--DBUILD_TESTS=ON/OFF
--DBUILD_BENCHMARKS=ON/OFF
--DBUILD_EXAMPLES=ON/OFF
--DBUILD_MODULE_EXAMPLES=ON/OFF
--DGALAY_HTTP_ENABLE_SSL=ON/OFF
+E12-HttpProxy [listen_port] [upstream_host] [upstream_port]
+             [mount_prefix] [mount_dir] [mount_mode]
+
+mount_mode: dynamic(默认) | hard | nginx(try_files)
+关闭 mount: mount_prefix 或 mount_dir 传 none/off
 ```
 
-`BUILD_MODULE_EXAMPLES` 需要 CMake >= 3.28，推荐 Ninja/Visual Studio 生成器。
+## 项目结构
 
-## 依赖
+```text
+galay-http/
+├── galay-http/
+│   ├── kernel/        # http / http2 / websocket 核心实现
+│   ├── protoc/        # 协议数据结构（http/http2/websocket）
+│   ├── utils/         # builder / logger / utils
+│   └── module/        # C++23 命名模块接口
+├── example/
+│   ├── common/        # 示例公共配置
+│   └── include/       # 示例实现（E1~E12）
+├── test/              # 测试（T*）
+├── benchmark/         # 压测（B*）
+└── docs/              # 主文档 + 测试/压测文档
+```
 
-C++23 编译器、CMake 3.22+、spdlog、galay-kernel。
+## 许可证
 
-若启用 TLS（HTTPS/WSS）需要额外链接 galay-ssl 与 OpenSSL。
-
-## 项目地址
-
-[https://github.com/gzj-creator/galay-http](https://github.com/gzj-creator/galay-http)
+MIT License

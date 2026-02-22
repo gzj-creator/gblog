@@ -1,163 +1,232 @@
-# galay-ssl 使用文档
+# galay-ssl
 
-> Generated from `/Users/gongzhijie/Desktop/projects/git/gblob/service/blog/frontend/docs/galay-ssl.html` for AI vector indexing.
+基于 C++23 协程的异步 SSL/TLS 库，属于 galay 生态。
 
-## 概览
+## 特性
 
-galay-ssl 是 Galay 库体系的 TLS 传输层，提供异步握手、加密收发与证书校验能力。
+- 异步 SSL Socket API（`SslSocket`），支持 `connect/handshake/recv/send/shutdown/close`
+- 基于 OpenSSL Memory BIO 的解耦实现（SSL 状态机与网络 IO 分离）
+- 支持 TLS 1.2 / TLS 1.3、SNI、ALPN、Session 复用
+- 统一 `std::expected` 风格错误返回（`SslError` / `IOError`）
+- 与 `galay-kernel` 协程调度器无缝集成
+- 支持 `kqueue`（macOS）、`epoll` / `io_uring`（Linux）
 
-它专注链路安全与兼容性，HTTP/RPC 等协议语义仍由上层库承担。
+## 文档导航
 
-## 架构
+建议按以下顺序阅读：
 
-- **SslContext** — 负责证书、私钥、TLS 方法与校验策略等上下文配置
-- **SslSocket** — 异步 TLS 套接字，封装 `connect/handshake/recv/send/shutdown/close`
-- **Memory BIO 管线** — 将 TLS 状态机与网络 IO 解耦，便于与协程调度器协同
-- **多后端调度** — 随平台使用 `kqueue` / `epoll` / `io_uring`
+1. [快速开始](docs/01-快速开始.md)
+2. [使用示例](docs/02-使用示例.md)
+3. [模块介绍](docs/03-模块介绍.md)
+4. [运行原理](docs/04-运行原理.md)
+5. [性能分析](docs/05-性能分析.md)
 
-## 核心 API
+## 依赖
 
-### 最小 TLS Echo 服务端（examples/include/E1-SslEchoServer.cc）
+- C++23 编译器（GCC 13+ / Clang 16+）
+- CMake 3.16+
+- OpenSSL 1.1.1+
+- Galay 内部依赖（统一联调推荐）：
+  - `galay-kernel`（构建必需）
+  - `galay-utils`（推荐）
+  - `galay-http`（推荐）
+- Linux 下启用 `io_uring` 时需要 `liburing`（缺失时自动回退 `epoll`）
+
+## 依赖安装（macOS / Homebrew）
+
+```bash
+brew install cmake spdlog openssl
+```
+
+## 依赖安装（Ubuntu / Debian）
+
+```bash
+sudo apt-get update
+sudo apt-get install -y cmake g++ libspdlog-dev libssl-dev liburing-dev
+```
+
+## 编译安装
+
+```bash
+git clone https://github.com/gzj-creator/galay-kernel.git
+git clone https://github.com/gzj-creator/galay-utils.git
+git clone https://github.com/gzj-creator/galay-http.git
+git clone https://github.com/gzj-creator/galay-ssl.git
+cd galay-ssl
+
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=ON
+cmake --build build --parallel
+
+# 安装（可选）
+sudo cmake --install build
+```
+
+仅单独构建 `galay-ssl` 时，最小内部依赖为 `galay-kernel`。
+
+Linux 强制使用 `epoll`：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=ON -DDISABLE_IOURING=ON
+cmake --build build --parallel
+```
+
+如果要显式关闭模块接口（默认开启，工具链支持时生效）：
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_LTO=ON -DBUILD_MODULE_EXAMPLES=OFF
+cmake --build build --parallel
+```
+
+## CMake 链接
+
+```cmake
+find_package(galay-ssl REQUIRED)
+target_link_libraries(your_target PRIVATE galay-ssl::galay-ssl)
+```
+
+如果是源码同仓构建（`add_subdirectory`），也可直接链接目标 `galay-ssl`。
+
+## C++23 Modules
+
+`galay-ssl` 现在支持 C++23 `import/export`（工具链支持时）：
+
+```cpp
+import galay.ssl;
+
+using namespace galay::ssl;
+```
+
+模块接口文件：`galay-ssl/module/galay.ssl.cppm`  
+传统 `#include` 用法仍完全可用。  
+说明：`BUILD_MODULE_EXAMPLES` 需要 CMake `>= 3.28` 且使用 `Ninja` / `Visual Studio` 生成器。`Unix Makefiles` 下会自动关闭。
+
+`examples/` 中也提供了模块化导入版本：
+
+- `examples/include/E1-SslEchoServer.cc`
+- `examples/include/E2-SslClient.cc`
+- `examples/import/E1-SslEchoServer.cc`
+- `examples/import/E2-SslClient.cc`
+
+### 模块支持更新（2026-02）
+
+本次模块接口已统一为同一范式：
+
+- `module;`
+- `#include "galay-ssl/module/ModulePrelude.hpp"`
+- `export module galay.ssl;`
+- `export { #include ... }`
+
+新增预导入头文件：`galay-ssl/module/ModulePrelude.hpp`，用于把系统/第三方依赖放在全局模块片段，降低模块构建期冲突。
+
+推荐构建命令（Clang 20 + Ninja）：
+
+```bash
+cmake -S . -B build-mod -G Ninja \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm@20/bin/clang++
+cmake --build build-mod --target galay-ssl-modules --parallel
+```
+
+## 快速开始
 
 ```cpp
 #include "galay-ssl/async/SslSocket.h"
 #include "galay-ssl/ssl/SslContext.h"
-#include
-#include
-#include
-#include
-#include
-#include
+#include <galay-kernel/kernel/Coroutine.h>
 
 #ifdef USE_KQUEUE
-#include
+#include <galay-kernel/kernel/KqueueScheduler.h>
 using IOSchedulerType = galay::kernel::KqueueScheduler;
 #elif defined(USE_EPOLL)
-#include
+#include <galay-kernel/kernel/EpollScheduler.h>
 using IOSchedulerType = galay::kernel::EpollScheduler;
 #elif defined(USE_IOURING)
-#include
+#include <galay-kernel/kernel/IOUringScheduler.h>
 using IOSchedulerType = galay::kernel::IOUringScheduler;
 #endif
 
 using namespace galay::ssl;
 using namespace galay::kernel;
 
-std::atomic g_running{true};
+Coroutine echoClient(SslContext* ctx)
+{
+    SslSocket sock(ctx);
+    sock.option().handleNonBlock();
+    sock.setHostname("127.0.0.1");
 
-void signalHandler(int) { g_running = false; }
+    auto conn = co_await sock.connect(Host(IPType::IPV4, "127.0.0.1", 8443));
+    if (!conn) co_return;
 
-Coroutine handleClient(SslContext* ctx, GHandle handle) {
-    SslSocket client(ctx, handle);
-    client.option().handleNonBlock();
-
-    while (!client.isHandshakeCompleted()) {
-        auto hs = co_await client.handshake();
+    while (!sock.isHandshakeCompleted()) {
+        auto hs = co_await sock.handshake();
         if (!hs) {
-            co_await client.close();
+            co_await sock.close();
             co_return;
         }
     }
 
-    char buffer[4096];
-    auto recvResult = co_await client.recv(buffer, sizeof(buffer));
-    if (recvResult && recvResult.value().size() > 0) {
-        auto& bytes = recvResult.value();
-        co_await client.send(reinterpret_cast(bytes.data()), bytes.size());
+    const char* msg = "hello";
+    auto s = co_await sock.send(msg, 5);
+    if (!s) {
+        co_await sock.close();
+        co_return;
     }
 
-    co_await client.shutdown();
-    co_await client.close();
-}
-
-Coroutine sslEchoServer(IOSchedulerType* scheduler, SslContext* ctx, uint16_t port) {
-    SslSocket listener(ctx);
-    listener.option().handleReuseAddr();
-    listener.option().handleNonBlock();
-
-    if (!listener.bind(Host(IPType::IPV4, "0.0.0.0", port))) co_return;
-    if (!listener.listen(128)) co_return;
-
-    while (g_running) {
-        Host clientHost;
-        auto accepted = co_await listener.accept(&clientHost);
-        if (accepted) {
-            scheduler->spawn(handleClient(ctx, accepted.value()));
-        }
+    char buf[256];
+    auto r = co_await sock.recv(buf, sizeof(buf));
+    if (r && r.value().size() > 0) {
+        // 处理 echo 数据
     }
-}
 
-int main(int argc, char* argv[]) {
-    if (argc (std::stoi(argv[1]));
-    SslContext ctx(SslMethod::TLS_Server);
-    if (!ctx.isValid()) return 1;
-    if (!ctx.loadCertificate(argv[2])) return 1;
-    if (!ctx.loadPrivateKey(argv[3])) return 1;
-
-    IOSchedulerType scheduler;
-    scheduler.start();
-    scheduler.spawn(sslEchoServer(&scheduler, &ctx, port));
-
-    while (g_running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-    scheduler.stop();
-    return 0;
+    co_await sock.shutdown();
+    co_await sock.close();
 }
 ```
 
-### 示例入口（与仓库一致）
-
-- `E1-SslEchoServer-Include` — `examples/include/E1-SslEchoServer.cc`
-- `E2-SslClient-Include` — `examples/include/E2-SslClient.cc`
-- `E1-SslEchoServer-Import` — `examples/import/E1-SslEchoServer.cc`
-- `E2-SslClient-Import` — `examples/import/E2-SslClient.cc`
-
-## 安装与构建
-
-### macOS
+## 运行测试与压测
 
 ```bash
-brew install cmake ninja pkg-config
-# 根据下方“依赖”章节补充库（如 openssl、spdlog、simdjson、liburing 等）
+# 构建 + 测试
+./scripts/run.sh build
+./scripts/run.sh test
+
+# 压测
+./scripts/run.sh bench
+
+# 结果检查
+./scripts/check.sh
 ```
 
-### Linux (Ubuntu/Debian)
+也可以直接运行：
 
 ```bash
-sudo apt update
-sudo apt install -y build-essential cmake ninja-build pkg-config
-# 根据下方“依赖”章节补充库（如 libssl-dev、libspdlog-dev、libsimdjson-dev、liburing-dev 等）
+./build/bin/T1-SslSocketTest
+./build/bin/B1-SslBenchServer 8443 certs/server.crt certs/server.key
+./build/bin/B1-SslBenchClient 127.0.0.1 8443 200 500 47 4
 ```
 
-### 通用构建
+## 性能摘要
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
-```
+以下数据来自仓库内最新 5 轮串行复测基线（本地环回，Release + LTO，记录日期：2026-02-13）：
 
-### 构建选项
+| 场景 | 参数 | 平均结果 |
+|------|------|----------|
+| 小包 QPS | `200 500 payload=47B threads=4` | 162,234 req/s |
+| 大包吞吐 | `10 200 payload=64KiB threads=1` | 1,981.10 MB/s |
 
-```text
--DBUILD_TESTS=ON/OFF
--DBUILD_BENCHMARKS=ON/OFF
--DBUILD_EXAMPLES=ON/OFF
--DBUILD_SHARED_LIBS=ON/OFF
--DENABLE_LOG=ON/OFF
--DENABLE_LTO=ON/OFF
--DDISABLE_IOURING=ON/OFF
--DBUILD_MODULE_EXAMPLES=ON/OFF
-```
+详细口径与历史对照见 [docs/05-性能分析.md](docs/05-性能分析.md)。
 
-`BUILD_MODULE_EXAMPLES` 需要 CMake >= 3.28 且建议使用 Ninja/Visual Studio 生成器。
+## 文档
 
-## 依赖
+详细文档见 [docs/](docs/)：
 
-C++23 编译器、CMake 3.16+、OpenSSL（1.1.1+）、galay-kernel。
+| 文档 | 说明 |
+|------|------|
+| [01-快速开始](docs/01-快速开始.md) | 依赖、编译、最小可运行示例、错误处理 |
+| [02-使用示例](docs/02-使用示例.md) | 服务端/客户端、证书验证、会话复用、超时示例 |
+| [03-模块介绍](docs/03-模块介绍.md) | `SslContext` / `SslEngine` / `SslSocket` / Awaitable 模块说明 |
+| [04-运行原理](docs/04-运行原理.md) | Memory BIO 状态机、协程调度流程、资源生命周期 |
+| [05-性能分析](docs/05-性能分析.md) | 压测方法、关键指标、优化建议 |
 
-启用日志时需要 spdlog；Linux 如启用 io_uring 需要 `liburing`。
+## 许可证
 
-## 项目地址
-
-[https://github.com/gzj-creator/galay-ssl](https://github.com/gzj-creator/galay-ssl)
+MIT License

@@ -84,7 +84,7 @@
 <ul>
 <li><strong>Runtime</strong> — 管理 IO/Compute 调度器生命周期，并通过 <code>getNextIOScheduler()</code> 分配协程执行位点</li>
 <li><strong>Coroutine / Awaitable</strong> — 统一 <code>co_await</code> 异步风格，覆盖网络、文件、同步原语与定时器</li>
-<li><strong>Scheduler</strong> — IO 调度与计算调度解耦，支持多调度器并行</li>
+<li><strong>IOScheduler / ComputeScheduler</strong> — IO 调度与计算调度解耦，支持多调度器并行</li>
 <li><strong>多后端 IO</strong> — macOS 使用 <code>kqueue</code>；Linux 在 <code>epoll/io_uring</code> 间按配置选择</li>
 </ul>
 

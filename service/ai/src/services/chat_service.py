@@ -121,6 +121,7 @@ _CPP_FENCE_BLOCK_RE = re.compile(
 _CPP_INCLUDE_LINE_RE = re.compile(r'^\s*#\s*include\s*[<"](?P<header>[^>"]+)[>"]\s*$')
 _CPP_IMPORT_LINE_RE = re.compile(r'^\s*import\s+(?P<module>[A-Za-z_][A-Za-z0-9_.]*)\s*;\s*$')
 _CPP_LANGS = {"cpp", "c++", "cc", "cxx", "hpp", "h"}
+_COMMAND_FENCE_LANGS = {"bash", "shell", "sh", "zsh", "cmake", "text", "plaintext"}
 _FENCED_CODE_BLOCK_RE = re.compile(r"(?ms)```.*?```")
 _GALAY_INCLUDE_PREFIX_TO_MODULE = (
     ("galay-kernel/", "galay.kernel"),
@@ -521,9 +522,10 @@ def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool 
         changed = True
         notes.append("说明：代码块已按统一缩进规则对齐（4 空格缩进，预处理行顶格）。")
 
-    for note in notes:
-        if note not in fixed:
-            fixed = f"{fixed.rstrip()}\n\n{note}"
+    command_reindented, command_rewritten = _normalize_command_fenced_blocks(fixed)
+    if command_rewritten:
+        fixed = command_reindented
+        changed = True
 
     if changed:
         logger.warning("Detected forbidden coroutine/API style in model output, auto-corrected")
@@ -964,6 +966,42 @@ def _reindent_cpp_fenced_blocks(text: str) -> tuple[str, bool]:
         if normalized_code != code or normalized_lang != lang:
             changed = True
 
+        return f"```{normalized_lang}\n{normalized_code}\n```"
+
+    fixed = _CPP_FENCE_BLOCK_RE.sub(_replace, text)
+    return fixed, changed
+
+
+def _normalize_command_fenced_blocks(text: str) -> tuple[str, bool]:
+    changed = False
+
+    def _replace(match: re.Match[str]) -> str:
+        nonlocal changed
+        lang = (match.group("lang") or "").strip()
+        lang_lower = lang.lower()
+        code = str(match.group("code") or "")
+
+        if lang_lower not in _COMMAND_FENCE_LANGS:
+            return match.group(0)
+
+        lines = code.split("\n")
+        while lines and not lines[0].strip():
+            lines.pop(0)
+        while lines and not lines[-1].strip():
+            lines.pop()
+
+        normalized_lines: List[str] = []
+        for line in lines:
+            if not line.strip():
+                normalized_lines.append("")
+                continue
+            normalized_lines.append(line.lstrip())
+
+        normalized_code = "\n".join(normalized_lines).rstrip()
+        if normalized_code != code:
+            changed = True
+
+        normalized_lang = lang_lower if lang_lower else "text"
         return f"```{normalized_lang}\n{normalized_code}\n```"
 
     fixed = _CPP_FENCE_BLOCK_RE.sub(_replace, text)

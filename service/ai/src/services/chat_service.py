@@ -123,6 +123,12 @@ _CPP_IMPORT_LINE_RE = re.compile(r'^\s*import\s+(?P<module>[A-Za-z_][A-Za-z0-9_.
 _CPP_LANGS = {"cpp", "c++", "cc", "cxx", "hpp", "h"}
 _COMMAND_FENCE_LANGS = {"bash", "shell", "sh", "zsh", "cmake", "text", "plaintext"}
 _FENCED_CODE_BLOCK_RE = re.compile(r"(?ms)```.*?```")
+_CPP_RAW_STRING_START_RE = re.compile(r'R"(?P<delim>[A-Za-z_][A-Za-z0-9_]{0,15}|)\(')
+_UNHANDLED_SEND_COAWAIT_LINE_RE = re.compile(
+    r"^(?P<indent>\s*)co_await\s+(?P<expr>.+?(?:\.|->)\s*"
+    r"(?:send|sendResponse|sendRequest|sendText|sendBinary|sendPing|sendPong)"
+    r"\s*\(.*\))\s*;\s*$"
+)
 _GALAY_INCLUDE_PREFIX_TO_MODULE = (
     ("galay-kernel/", "galay.kernel"),
     ("galay-ssl/", "galay.ssl"),
@@ -515,6 +521,12 @@ def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool 
             notes.append(
                 "说明：代码示例已补齐 `#include` 与 `import` 双范式，便于在传统头文件模式与 C++23 模块模式间切换。"
             )
+
+    coawait_fixed, coawait_rewritten = _rewrite_unhandled_send_coawait_returns(fixed)
+    if coawait_rewritten:
+        fixed = coawait_fixed
+        changed = True
+        notes.append("说明：`co_await` 发送调用已显式处理返回值。")
 
     reindented, cpp_reindented = _reindent_cpp_fenced_blocks(fixed)
     if cpp_reindented:
@@ -972,6 +984,49 @@ def _reindent_cpp_fenced_blocks(text: str) -> tuple[str, bool]:
     return fixed, changed
 
 
+def _rewrite_unhandled_send_coawait_returns(text: str) -> tuple[str, bool]:
+    changed = False
+    counter = 0
+
+    def _rewrite_code(code: str) -> tuple[str, bool]:
+        nonlocal counter
+        lines = str(code or "").split("\n")
+        output: List[str] = []
+        local_changed = False
+        for raw in lines:
+            match = _UNHANDLED_SEND_COAWAIT_LINE_RE.match(raw)
+            if not match:
+                output.append(raw)
+                continue
+
+            indent = match.group("indent")
+            expr = match.group("expr").strip()
+            counter += 1
+            var_name = f"send_result_{counter}"
+            output.append(f"{indent}auto {var_name} = co_await {expr};")
+            output.append(f"{indent}if (!{var_name}) {{")
+            output.append(f"{indent}    // TODO: handle send failure")
+            output.append(f"{indent}}}")
+            local_changed = True
+        return "\n".join(output), local_changed
+
+    def _replace(match: re.Match[str]) -> str:
+        nonlocal changed
+        lang = (match.group("lang") or "").strip().lower()
+        code = str(match.group("code") or "")
+        if lang not in _CPP_LANGS and not (not lang and _looks_like_cpp_snippet(code)):
+            return match.group(0)
+
+        rewritten_code, code_changed = _rewrite_code(code)
+        if code_changed:
+            changed = True
+        normalized_lang = lang or "cpp"
+        return f"```{normalized_lang}\n{rewritten_code}\n```"
+
+    fixed = _CPP_FENCE_BLOCK_RE.sub(_replace, text)
+    return fixed, changed
+
+
 def _normalize_command_fenced_blocks(text: str) -> tuple[str, bool]:
     changed = False
 
@@ -1035,17 +1090,47 @@ def _reindent_cpp_code(code: str) -> str:
 
     output: List[str] = []
     depth = 0
+    chain_indent_level: int | None = None
+    raw_string_delim: str | None = None
+
+    def _starts_raw_string(line: str) -> str | None:
+        match = _CPP_RAW_STRING_START_RE.search(line)
+        if not match:
+            return None
+        return match.group("delim") or ""
+
+    def _raw_string_closed(line: str, delim: str) -> bool:
+        return f"){delim}\"" in line
 
     for raw in lines:
-        stripped = str(raw).strip()
+        line = str(raw).rstrip()
+
+        if raw_string_delim is not None:
+            output.append(line)
+            if _raw_string_closed(line, raw_string_delim):
+                raw_string_delim = None
+            continue
+
+        stripped = line.strip()
         if not stripped:
             output.append("")
+            chain_indent_level = None
             continue
 
         starts_with_close = stripped.startswith("}")
         indent_level = max(depth - 1, 0) if starts_with_close else depth
+        if stripped.startswith("."):
+            if chain_indent_level is None:
+                chain_indent_level = max(indent_level + 1, 1)
+            indent_level = chain_indent_level
+        else:
+            chain_indent_level = None
         indent = "" if stripped.startswith("#") else ("    " * indent_level)
         output.append(f"{indent}{stripped}")
+
+        raw_delim = _starts_raw_string(stripped)
+        if raw_delim is not None and not _raw_string_closed(stripped, raw_delim):
+            raw_string_delim = raw_delim
 
         open_count = stripped.count("{")
         close_count = stripped.count("}")

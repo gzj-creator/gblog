@@ -65,7 +65,8 @@ Galay 是一个基于 C++20/23 协程的高性能异步网络框架，包含以�
     - `galay-mysql`：`AsyncMysqlClient client(scheduler)`（异步场景）
     - `galay-mongo`：`AsyncMongoClient client(scheduler)`（异步场景）
     - `galay-etcd`：`AsyncEtcdClient client(scheduler)`（异步场景）
-    - `galay-mcp`：`McpStdioServer::run()` 或 `McpHttpServer(host, port).start()`。"""
+    - `galay-mcp`：`McpStdioServer::run()` 或 `McpHttpServer(host, port).start()`。
+23. 只要出现 `co_await` 的发送/请求调用（如 `send/sendResponse/sendRequest/sendText`），必须显式处理返回值，不能只写一行 `co_await ...;`。"""
 
 _USAGE_QUERY_RE = re.compile(
     r"(示例|demo|example|sample|用法|怎么用|如何用|如何使用|入门|快速开始|最小示例|最小用例|代码示例|样例)",

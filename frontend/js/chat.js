@@ -605,6 +605,7 @@ class ChatApp {
             text = this._splitCollapsedCppCode(text);
             text = this._reindentBraceCode(text);
         } else if (['bash', 'sh', 'zsh'].includes(lang)) {
+            text = this._stripCommandLineIndent(text);
             text = text.replace(/(\bcd\s+\S*?)(cmake\s+\.\.)/gi, '$1\n$2');
             if (this._needsCodeReflow(text)) {
                 text = text.replace(/;\s*(?=\S)/g, ';\n');
@@ -612,10 +613,25 @@ class ChatApp {
                 text = text.replace(/(\bcd\s+\S+)(?=(?:cmake\s|make\b|\.\/|nc\b|telnet\b))/gi, '$1\n');
             }
         } else if (lang === 'cmake' && this._needsCodeReflow(text)) {
+            text = this._stripCommandLineIndent(text);
             text = text.replace(/\)\s*(?=[A-Za-z_])/g, ')\n');
+        } else if (lang === 'text') {
+            text = this._stripCommandLineIndent(text);
         }
 
         return text;
+    }
+
+    _stripCommandLineIndent(code) {
+        const lines = String(code || '').split('\n');
+        return lines
+            .map((line) => {
+                if (!line.trim()) return '';
+                return line.replace(/^\s+/, '');
+            })
+            .join('\n')
+            .replace(/\n{3,}/g, '\n\n')
+            .trimEnd();
     }
 
     _sanitizeCodeFenceContent(code, language) {

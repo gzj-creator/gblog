@@ -1,4 +1,4 @@
-# API 参考
+# 02-API参考
 
 ## 1. 基础类型
 
@@ -7,7 +7,9 @@
 - `endpoint`：etcd HTTP 地址，默认 `http://127.0.0.1:2379`
 - `api_prefix`：API 前缀，默认 `/v3`
 
-### `AsyncEtcdConfig`
+### `EtcdNetworkConfig`
+
+网络传输参数，同步/异步客户端共用。旧名 `AsyncEtcdConfig` 仍可用（类型别名）。
 
 - `request_timeout`：请求超时，默认禁用
 - `buffer_size`：HTTP 会话 ring buffer，默认 `16384`
@@ -20,7 +22,7 @@
 
 ### `EtcdError`
 
-- 错误码包括：`INVALID_PARAM`、`NOT_CONNECTED`、`CONNECTION`、`TIMEOUT`、`HTTP`、`SERVER`、`PARSE` 等。
+- 错误码（`enum class EtcdErrorType`）：`Success`、`InvalidEndpoint`、`InvalidParam`、`NotConnected`、`Connection`、`Timeout`、`Send`、`Recv`、`Http`、`Server`、`Parse`、`Internal`。
 
 ## 2. `AsyncEtcdClient`（异步）
 
@@ -69,30 +71,30 @@
 - JSON 解析使用 `simdjson`，替代手写字符串扫描解析。
 - 请求响应解析改为“每个业务操作单次解析”：`PostJsonAwaitable` 仅处理 HTTP 层，业务层统一做 JSON 与 etcd `code/message` 校验。
 
-## 3. `EtcdClient`（协程封装）
+## 3. `EtcdClient`（同步阻塞）
 
-说明：`EtcdClient` 仅做协程接口封装，不包含 `promise/future` 阻塞桥接。
+说明：`EtcdClient` 不依赖 Awaitable，所有接口为阻塞调用，返回 `std::expected<void, EtcdError>`。
 
 ### 连接管理
 
-- `connect() -> ConnectAwaitable`
-- `close() -> CloseAwaitable`
+- `connect()`
+- `close()`
 - `connected() const`
 
 ### KV 能力
 
-- `put(key, value, lease_id?) -> PutAwaitable`
-- `get(key, prefix=false, limit?) -> GetAwaitable`
-- `del(key, prefix=false) -> DeleteAwaitable`
+- `put(key, value, lease_id?)`
+- `get(key, prefix=false, limit?)`
+- `del(key, prefix=false)`
 
 ### 租约能力
 
-- `grantLease(ttl_seconds) -> GrantLeaseAwaitable`
-- `keepAliveOnce(lease_id) -> KeepAliveAwaitable`
+- `grantLease(ttl_seconds)`
+- `keepAliveOnce(lease_id)`
 
 ### Pipeline 能力
 
-- `pipeline(std::vector<PipelineOp>) -> PipelineAwaitable`
+- `pipeline(std::vector<PipelineOp>)`
 - `lastPipelineResults()`
 
 ### 结果读取

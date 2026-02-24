@@ -8,6 +8,7 @@ _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$")
 _BLOCKQUOTE_RE = re.compile(r"^>\s?(.*)$")
 _OL_RE = re.compile(r"^[✅☑️✔️🔥🌟🧠🔧⚙️🛠️📈📌]?\s*(\d+)\.\s+(.+)$", re.UNICODE)
 _UL_RE = re.compile(r"^[-*]\s+(.+)$")
+_COMMAND_LANGS = {"bash", "shell", "sh", "zsh", "cmake", "text", "plaintext"}
 
 
 def markdown_to_blocks(markdown_text: str) -> List[Dict[str, Any]]:
@@ -67,7 +68,13 @@ def markdown_to_blocks(markdown_text: str) -> List[Dict[str, Any]]:
 
     def flush_code() -> None:
         nonlocal code_lines, code_lang
-        text_value = "\n".join(code_lines).strip("\n")
+        normalized_lines = code_lines
+        if code_lang in _COMMAND_LANGS:
+            normalized_lines = [
+                (line.lstrip() if str(line).strip() else "")
+                for line in code_lines
+            ]
+        text_value = "\n".join(normalized_lines).strip("\n")
         if text_value:
             blocks.append({"type": "code", "language": code_lang or "text", "code": text_value})
         code_lines = []

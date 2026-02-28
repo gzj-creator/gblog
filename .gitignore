@@ -39,3 +39,4 @@ service/**/venv/
 service/**/.venv/
 service/**/*.pyc
 service/**/*.pyo
+.worktrees/

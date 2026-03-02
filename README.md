@@ -33,6 +33,20 @@ blog/
 - `/api -> business(8080)`
 - `/ai -> ai(8000)`
 
+## 服务端口汇总
+
+当前 `docker-compose.yml` 使用 `network_mode: host`，服务监听端口如下：
+
+| 服务 | 端口 | 说明 |
+| --- | --- | --- |
+| gateway | 80 | 网关入口与静态资源 |
+| business | 8080 | 博客业务 API |
+| auth | 8081 | 认证 API |
+| db | 8082 | 数据库抽象服务 API |
+| admin | 8010 | 后台管理 API |
+| indexer | 8011 | 索引任务服务 API |
+| ai | 8000 | 检索问答服务 API |
+
 ## 本地构建
 
 ```bash

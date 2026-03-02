@@ -1,6 +1,65 @@
 version: "3.8"
 
+x-galay-build-args: &galay_build_args
+  GALAY_BASE_IMAGE: ${GALAY_BASE_IMAGE:-ubuntu:galay-v1}
+  GALAY_KERNEL_BACKEND: ${GALAY_KERNEL_BACKEND:-epoll}
+
 services:
+  db:
+    build:
+      context: ./service/db
+      dockerfile: docker/Dockerfile
+      args: *galay_build_args
+    container_name: gblob-db
+    command: ["/bin/sh", "-lc", "mkdir -p /app/logs && exec ./bin/db-server -h 0.0.0.0 -p 8082 >> /app/logs/db-server.log 2>&1"]
+    environment:
+      LD_LIBRARY_PATH: /usr/local/lib
+      DB_MYSQL_HOST: ${DB_MYSQL_HOST:-127.0.0.1}
+      DB_MYSQL_PORT: ${DB_MYSQL_PORT:-3306}
+      DB_MYSQL_USER: ${DB_MYSQL_USER:-root}
+      DB_MYSQL_PASSWORD: ${DB_MYSQL_PASSWORD:-password}
+      DB_MYSQL_DATABASE: ${DB_MYSQL_DATABASE:-gblob}
+      DB_MYSQL_CHARSET: ${DB_MYSQL_CHARSET:-utf8mb4}
+    network_mode: host
+    volumes:
+      - ${DB_CONFIG_DIR:-./service/db/config}:/app/config
+      - ${DB_LOGS_DIR:-./service/db/logs}:/app/logs
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ./service/auth
+      dockerfile: docker/Dockerfile
+      args: *galay_build_args
+    container_name: gblob-auth
+    command: ["/bin/sh", "-lc", "mkdir -p /app/logs && exec ./bin/auth-server -h 0.0.0.0 -p 8081 >> /app/logs/auth-server.log 2>&1"]
+    depends_on:
+      - db
+    environment:
+      LD_LIBRARY_PATH: /usr/local/lib
+      DB_SERVICE_HOST: ${AUTH_DB_SERVICE_HOST:-127.0.0.1}
+      DB_SERVICE_PORT: ${AUTH_DB_SERVICE_PORT:-8082}
+    network_mode: host
+    volumes:
+      - ${AUTH_CONFIG_DIR:-./service/auth/config}:/app/config
+      - ${AUTH_LOGS_DIR:-./service/auth/logs}:/app/logs
+    restart: unless-stopped
+
+  business:
+    build:
+      context: ./service/business
+      dockerfile: docker/Dockerfile
+      args: *galay_build_args
+    container_name: gblob-business
+    command: ["/bin/sh", "-lc", "mkdir -p /app/logs && exec ./bin/backend-server -h 0.0.0.0 -p 8080 >> /app/logs/business-server.log 2>&1"]
+    environment:
+      LD_LIBRARY_PATH: /usr/local/lib
+    network_mode: host
+    volumes:
+      - ${BUSINESS_CONFIG_DIR:-./service/business/config}:/app/config
+      - ${BUSINESS_LOGS_DIR:-./service/business/logs}:/app/logs
+    restart: unless-stopped
+
   ai:
     build:
       context: ./service/ai
@@ -8,54 +67,100 @@ services:
     container_name: gblob-ai
     command: ["python", "scripts/run_server.py", "--host", "0.0.0.0", "--port", "8000"]
     env_file:
-      - ./service/ai/.env
+      - ${AI_ENV_FILE:-./service/ai/.env}
     environment:
       ENVIRONMENT: production
-      LOG_LEVEL: INFO
+      LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
       LOG_DIR: /app/logs
       LOG_FILE: ai-service.log
-      GALAY_DOCS_ROOT_PATH: ${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}
+      GALAY_DOCS_ROOT_PATH: /app/managed_docs
+      DB_SERVICE_BASE_URL: ${AI_DB_SERVICE_BASE_URL:-http://127.0.0.1:8082}
+      INDEX_STATE_AUTO_RELOAD: ${AI_INDEX_STATE_AUTO_RELOAD:-true}
+      INDEX_STATE_POLL_INTERVAL_SECONDS: ${AI_INDEX_STATE_POLL_INTERVAL_SECONDS:-2.0}
     volumes:
-      - ./service/ai/data:/app/vector_store
-      - ./service/ai/logs:/app/logs
-      - ${GALAY_DOCS_ROOT_PATH:-./repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
+      - ${AI_CONFIG_DIR:-./service/ai/config}:/app/config
+      - ${AI_DATA_DIR:-./service/ai/data}:/app/vector_store
+      - ${AI_LOGS_DIR:-./service/ai/logs}:/app/logs
+      - ${ADMIN_MANAGED_DOCS_DIR:-./service/admin/managed_docs}:/app/managed_docs:ro
     network_mode: host
     restart: unless-stopped
 
-  backend:
-    image: ubuntu-24.04:galay-web-1.0
-    container_name: gblob-backend
-    working_dir: /app
-    command: ["./bin/backend-server", "-h", "0.0.0.0", "-p", "8080"]
+  admin:
+    build:
+      context: ./service/admin
+      dockerfile: docker/Dockerfile
+    container_name: gblob-admin
+    command: ["/bin/sh", "-lc", "mkdir -p /app/logs && exec python scripts/run_server.py --host 0.0.0.0 --port 8010 >> /app/logs/admin-service.log 2>&1"]
+    depends_on:
+      - db
     environment:
-      LD_LIBRARY_PATH: /usr/local/lib
+      DB_SERVICE_BASE_URL: ${ADMIN_DB_SERVICE_BASE_URL:-http://127.0.0.1:8082}
+      ADMIN_MANAGED_DOCS_PATH: /app/managed_docs
+      ADMIN_RUNTIME_CONFIG_PATH: /app/config/admin_config.json
+      ADMIN_AUTH_ENABLED: "${ADMIN_AUTH_ENABLED:-true}"
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123456}
     network_mode: host
     volumes:
-      - ./service/backend/bin:/app/bin:ro
-      - ./service/backend/logs:/app/logs
+      - ${ADMIN_CONFIG_DIR:-./service/admin/config}:/app/config
+      - ${ADMIN_LOGS_DIR:-./service/admin/logs}:/app/logs
+      - ${ADMIN_MANAGED_DOCS_DIR:-./service/admin/managed_docs}:/app/managed_docs
     restart: unless-stopped
 
-  static:
-    image: ubuntu-24.04:galay-web-1.0
-    container_name: gblob-static
-    working_dir: /app
+  indexer:
+    build:
+      context: .
+      dockerfile: service/indexer/docker/Dockerfile
+    container_name: gblob-indexer
+    command: ["/bin/sh", "-lc", "mkdir -p /app/logs && exec python scripts/run_server.py --host 0.0.0.0 --port 8011 >> /app/logs/indexer-service.log 2>&1"]
+    depends_on:
+      - db
+    environment:
+      INDEXER_DB_BASE_URL: ${INDEXER_DB_BASE_URL:-http://127.0.0.1:8082}
+      INDEXER_AUTO_START: "${INDEXER_AUTO_START:-true}"
+      INDEXER_POLL_INTERVAL_SECONDS: ${INDEXER_POLL_INTERVAL_SECONDS:-2.0}
+      INDEXER_AI_ROOT: /app/ai
+      INDEXER_BUILD_SCRIPT: scripts/build_index.py
+      PYTHON_BIN: python
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_API_BASE: ${OPENAI_API_BASE:-https://api.openai.com/v1}
+      GALAY_DOCS_ROOT_PATH: /app/managed_docs
+      VECTOR_STORE_PATH: /app/ai/vector_store
+      LOG_DIR: /app/logs
+      LOG_FILE: indexer-build.log
+    network_mode: host
+    volumes:
+      - ${INDEXER_CONFIG_DIR:-./service/indexer/config}:/app/config
+      - ${INDEXER_LOGS_DIR:-./service/indexer/logs}:/app/logs
+      - ${AI_DATA_DIR:-./service/ai/data}:/app/ai/vector_store
+      - ${ADMIN_MANAGED_DOCS_DIR:-./service/admin/managed_docs}:/app/managed_docs:ro
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ./service/gateway
+      dockerfile: docker/Dockerfile
+      args: *galay_build_args
+    container_name: gblob-gateway
     command: ["./bin/static-server"]
     depends_on:
       - ai
-      - backend
+      - business
+      - auth
+      - db
+      - admin
     environment:
       STATIC_HOST: 0.0.0.0
       STATIC_PORT: 80
       STATIC_FRONTEND_ROOT: /app/frontend
       STATIC_LOG_DIR: /app/logs
-      STATIC_LOG_FILE: static-server.log
+      STATIC_LOG_FILE: gateway-server.log
       STATIC_CONFIG_PATH: /app/config/static-server.conf
       API_PROXY_ENABLED: ${API_PROXY_ENABLED:-true}
       LD_LIBRARY_PATH: /usr/local/lib
     network_mode: host
     volumes:
-      - ./service/static/bin:/app/bin:ro
-      - ./service/static/logs:/app/logs
-      - ./service/static/config:/app/config:ro
-      - ./frontend:/app/frontend:ro
+      - ${GATEWAY_CONFIG_DIR:-./service/gateway/config}:/app/config:ro
+      - ${GATEWAY_LOGS_DIR:-./service/gateway/logs}:/app/logs
+      - ${GATEWAY_FRONTEND_DIR:-./frontend}:/app/frontend:ro
     restart: unless-stopped

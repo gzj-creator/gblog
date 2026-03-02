@@ -1,147 +1,116 @@
 # Galay Blog
 
-基于 Galay Framework 构建的个人技术博客系统，用于展示 Galay 系列开源项目。
+基于 Galay Framework 的博客系统，当前采用独立进程架构：
+
+- `gateway`：统一入口与静态资源
+- `business`：博客业务接口
+- `auth`：认证接口
+- `db`：数据库抽象与用户/文档元数据存储
+- `admin`：后台文档管理（上传/更新/删除）
+- `indexer`：索引任务消费与重建执行
+- `ai`：检索问答（chat/search）
 
 ## 项目结构
 
-```
+```text
 blog/
-├── frontend/           # 前端静态页面
-│   ├── css/           # 样式文件
-│   ├── js/            # JavaScript 脚本
-│   ├── index.html     # 首页
-│   ├── projects.html  # 项目展示
-│   ├── docs.html      # 文档中心
-│   ├── blog.html      # 博客列表
-│   ├── article.html   # 文章详情
-│   ├── search.html    # 搜索页面
-│   ├── login.html     # 登录页面
-│   ├── register.html  # 注册页面
-│   └── profile.html   # 个人中心
-├── service/           # 服务目录
-│   ├── backend/       # C++ 博客 API 服务
-│   ├── static/        # 静态站点 + 反向代理
-│   └── ai/            # AI 问答服务
-└── docker-compose.yml # 容器编排（static + backend + ai）
+├── frontend/
+├── service/
+│   ├── gateway/
+│   ├── business/
+│   ├── auth/
+│   ├── db/
+│   ├── admin/
+│   ├── indexer/
+│   └── ai/
+└── docker-compose.yml
 ```
 
-## 技术栈
+## 网关路由
 
-### 后端
-- **galay-kernel**: 高性能 C++ 协程网络库
-- **galay-http**: HTTP/WebSocket 协议库
-- **C++23**: 协程、`std::expected`、concepts、ranges 等现代特性
+- `/api/v1/auth -> auth(8081)`
+- `/api/v1/admin -> admin(8010)`
+- `/api -> business(8080)`
+- `/ai -> ai(8000)`
 
-### 前端
-- **原生 HTML/CSS/JS**: 无框架依赖
-- **响应式设计**: 支持移动端和桌面端
-- **暗色主题**: 赛博朋克风格 UI
-
-## 功能特性
-
-### API 接口
-
-| 接口 | 方法 | 描述 |
-|------|------|------|
-| `/api/health` | GET | 健康检查 |
-| `/api/projects` | GET | 获取项目列表 |
-| `/api/projects/:id` | GET | 获取项目详情 |
-| `/api/posts` | GET | 获取博客文章列表 |
-| `/api/posts/:id` | GET | 获取文章详情 |
-| `/api/docs` | GET | 获取文档列表 |
-| `/api/docs/:id` | GET | 获取文档详情 |
-
-### 前端功能
-- 项目展示与详情查看
-- 文档中心（快速开始、使用指南、API 参考）
-- 博客文章列表与阅读
-- 全局搜索（Ctrl+K 快捷键）
-- 用户认证（登录/注册/个人中心）
-
-## 快速开始
-
-### 环境要求
-- C++23 编译器 (GCC 13+, Clang 17+)
-- CMake 3.20+
-- galay-kernel 和 galay-http 已安装
-
-### 编译运行
+## 本地构建
 
 ```bash
-# 进入 API 服务目录
-cd service/backend
-
-# 编译
-mkdir build && cd build
-cmake ..
-make -j
-
-# 运行
-./bin/backend-server -p 8080
+bash service/db/scripts/S3-Build.sh
+bash service/auth/scripts/S3-Build.sh
+bash service/business/scripts/S3-Build.sh
+bash service/gateway/scripts/builder.sh
 ```
 
-### 命令行参数
-
-| 参数 | 说明 | 默认值 |
-|------|------|--------|
-| `-h, --host` | 监听地址 | 0.0.0.0 |
-| `-p, --port` | 监听端口 | 8080 |
-| `-s, --static` | 静态文件目录 | disabled |
-
-### 访问
-
-启动后访问 http://localhost:8080
-
-## Docker 部署
+Python 服务安装依赖：
 
 ```bash
-# 全服务 host 网络（Linux）
-docker compose up -d
+python3 -m venv service/admin/venv && service/admin/venv/bin/pip install -r service/admin/requirements.txt
+python3 -m venv service/indexer/venv && service/indexer/venv/bin/pip install -r service/indexer/requirements.txt
+python3 -m venv service/ai/venv && service/ai/venv/bin/pip install -r service/ai/requirements.txt
 ```
 
-AI 知识库文档默认从项目目录 `./repos` 挂载到容器内 `/docs/repos`。
-索引时会自动排除 `.claude/` 与 `todo/` 目录内容。
-
-如果页面一直转圈，可先做连通性检查：
+## Docker 运行
 
 ```bash
-# 1) 检查 static 的代理路由是否生效
-docker compose exec static sh -lc 'echo "$API_PROXY_ROUTES"'
-
-# 2) host 模式：backend / ai 都应可访问
-docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8080/api/health'
-docker compose exec static sh -lc 'curl -m 3 -sv http://127.0.0.1:8000/health'
-
-# 3) 查看三服务日志
-docker compose logs --tail=200 static backend ai
-tail -f service/static/logs/static-server.log
-tail -f service/ai/logs/ai-service.log
+bash scripts/compose-stack.sh up
 ```
 
-## Kubernetes 部署
+服务清单：`gateway`, `business`, `auth`, `db`, `admin`, `indexer`, `ai`（全部由 Dockerfile 构建）。
+
+## 一键构建与启动（推荐）
+
+脚本会自动：
+
+- 创建各服务挂载目录（配置/日志/数据）
+- 初始化默认配置文件（如 `gateway` 配置、`ai` 的 `.env`）
+- 构建全部镜像并后台启动
 
 ```bash
-# 应用配置
-kubectl apply -f service/backend/k8s/
-
-# 查看状态
-kubectl get pods -l app=backend-service
+bash scripts/compose-stack.sh up
 ```
 
-## 性能指标
+默认挂载根目录为 `/root/service`，目录示例：
 
-基于 galay-kernel 的高性能特性：
-- **QPS**: 313,841
-- **吞吐量**: 153.24 MB/s
-- **延迟 P99**: < 1ms
+- `/root/service/gateway/config`
+- `/root/service/gateway/logs`
+- `/root/service/business/logs`
+- `/root/service/auth/logs`
+- `/root/service/db/logs`
+- `/root/service/admin/config`
+- `/root/service/admin/logs`
+- `/root/service/admin/managed_docs`
+- `/root/service/ai/config`
+- `/root/service/ai/logs`
+- `/root/service/ai/data`
+- `/root/service/indexer/logs`
 
-## 相关项目
+### 自定义挂载目录
 
-- [galay-kernel](https://github.com/gzj-creator/galay-kernel) - 高性能 C++20 协程网络库
-- [galay-http](https://github.com/gzj-creator/galay-http) - HTTP/WebSocket 协议库
-- [galay-utils](https://github.com/gzj-creator/galay-utils) - C++20 工具库
-- [galay-mcp](https://github.com/gzj-creator/galay-mcp) - MCP 协议库
+可通过环境变量覆盖，示例：
 
-## 许可证
+```bash
+export SERVICE_MOUNT_ROOT=/data/blog-services
+export GATEWAY_CONFIG_DIR=/data/custom/gateway/config
+export AI_ENV_FILE=/data/custom/ai/.env
+bash scripts/compose-stack.sh up
+```
 
-MIT License
+脚本支持动作：
+
+```bash
+bash scripts/compose-stack.sh build
+bash scripts/compose-stack.sh down
+bash scripts/compose-stack.sh restart
+bash scripts/compose-stack.sh ps
+bash scripts/compose-stack.sh logs gateway
+```
+
+## 基础镜像说明
+
+依赖 Galay 系列库的服务（`gateway/business/auth/db`）统一从 `ubuntu:galay-v1` 进行编译和运行，可通过环境变量覆盖：
+
+```bash
+export GALAY_BASE_IMAGE=ubuntu:galay-v1
+export GALAY_KERNEL_BACKEND=epoll
+```

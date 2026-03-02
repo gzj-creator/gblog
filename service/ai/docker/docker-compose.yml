@@ -13,10 +13,13 @@ services:
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
-      - GALAY_DOCS_ROOT_PATH=${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}
+      - GALAY_DOCS_ROOT_PATH=${GALAY_DOCS_CONTAINER_ROOT_PATH:-/app/managed_docs}
+      - DB_SERVICE_BASE_URL=${DB_SERVICE_BASE_URL:-http://host.docker.internal:8082}
+      - INDEX_STATE_AUTO_RELOAD=${INDEX_STATE_AUTO_RELOAD:-true}
+      - INDEX_STATE_POLL_INTERVAL_SECONDS=${INDEX_STATE_POLL_INTERVAL_SECONDS:-2.0}
     volumes:
       - ../data:/app/vector_store
       - ../logs:/app/logs
       # 挂载仓库根目录，容器内自动扫描挂载目标下所有一级子目录
-      - ${GALAY_DOCS_ROOT_PATH:-/tmp/repos}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/docs/repos}:ro
+      - ${GALAY_DOCS_ROOT_PATH:-/tmp/managed_docs}:${GALAY_DOCS_CONTAINER_ROOT_PATH:-/app/managed_docs}:ro
     restart: unless-stopped

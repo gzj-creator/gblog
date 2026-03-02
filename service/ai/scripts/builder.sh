@@ -33,7 +33,7 @@ Options:
   --run-eval             Run KB evaluation after rebuild
   --min-pass-rate <v>    Pass threshold for evaluation (default: 0.70)
   --generate-docs        Ask rebuild_kb.py to generate galay docs before indexing
-  --docs-root <path>     Override GALAY_DOCS_ROOT_PATH (default: <project>/repos)
+  --docs-root <path>     Override GALAY_DOCS_ROOT_PATH (default: <project>/service/ai/managed_docs)
   --help                 Show this help
 
 Environment:
@@ -100,7 +100,7 @@ if [[ ! -f "${COMPOSE_FILE}" ]]; then
 fi
 
 resolve_docs_root() {
-  local raw="${DOCS_ROOT_OVERRIDE:-${GALAY_DOCS_ROOT_PATH:-${PROJECT_DIR}/repos}}"
+  local raw="${DOCS_ROOT_OVERRIDE:-${GALAY_DOCS_ROOT_PATH:-${PROJECT_DIR}/service/ai/managed_docs}}"
   raw="${raw/#\~/${HOME}}"
   if [[ "${raw}" != /* ]]; then
     raw="${PROJECT_DIR}/${raw}"
@@ -123,7 +123,7 @@ validate_docs_root() {
   subdir_count="$(find "${DOCS_ROOT_EFFECTIVE}" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d '[:space:]')"
   echo "[INFO] Docs root (host): ${DOCS_ROOT_EFFECTIVE} (subdirs=${subdir_count})"
   if [[ "${REBUILD_KB}" == "true" && "${subdir_count}" == "0" ]]; then
-    echo "[ERROR] No repository subdirectories found under docs root." >&2
+    echo "[ERROR] No project subdirectories found under docs root." >&2
     echo "[ERROR] Expected layout like: <docs-root>/galay-http, <docs-root>/galay-kernel ..." >&2
     exit 1
   fi

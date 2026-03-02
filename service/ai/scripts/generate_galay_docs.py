@@ -141,7 +141,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default="repos",
+        default="service/ai/managed_docs",
         help="Output directory with galay-* subdirectories and README.md",
     )
     args = parser.parse_args()

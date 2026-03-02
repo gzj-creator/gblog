@@ -44,8 +44,8 @@ Options:
   -h, --help             Show this help
 
 Examples:
-  bash scripts/install_linux.sh --docs-root /opt/repos --api-key sk-xxx
-  bash scripts/install_linux.sh --docs-root /opt/repos --build-index --run
+  bash scripts/install_linux.sh --docs-root /opt/managed_docs --api-key sk-xxx
+  bash scripts/install_linux.sh --docs-root /opt/managed_docs --build-index --run
 EOF
 }
 

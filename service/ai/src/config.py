@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     GALAY_UTILS_DOCS_PATH: str = ""
     GALAY_MCP_DOCS_PATH: str = ""
 
+    # DB index-state watcher
+    DB_SERVICE_BASE_URL: str = ""
+    INDEX_STATE_AUTO_RELOAD: bool = True
+    INDEX_STATE_POLL_INTERVAL_SECONDS: float = 2.0
+    INDEX_STATE_REQUEST_TIMEOUT_SECONDS: float = 3.0
+
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8000

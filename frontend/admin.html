@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台管理 | Galay AI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/admin.css?v=20260226a">
+</head>
+<body>
+    <div class="scanlines"></div>
+    <div class="cursor-glow" id="cursorGlow"></div>
+
+    <nav class="nav">
+        <div class="nav-container">
+            <a href="index.html" class="nav-logo">
+                <span class="logo-bracket">[</span>
+                <span class="logo-text">galay</span>
+                <span class="logo-bracket">]</span>
+            </a>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link"><span class="nav-link-prefix">~/</span>home</a>
+                <a href="chat.html" class="nav-link"><span class="nav-link-prefix">~/</span>ai</a>
+                <a href="admin.html" class="nav-link active"><span class="nav-link-prefix">~/</span>admin</a>
+                <a href="https://github.com/gzj-creator" class="nav-link" target="_blank">
+                    <span class="nav-link-prefix">~/</span>github
+                </a>
+            </div>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="index.html" class="mobile-link">home</a>
+        <a href="chat.html" class="mobile-link">ai</a>
+        <a href="admin.html" class="mobile-link active">admin</a>
+        <a href="https://github.com/gzj-creator" class="mobile-link" target="_blank">github</a>
+    </div>
+
+    <main class="admin-page">
+        <section class="admin-header">
+            <h1>AI 后台管理</h1>
+            <p>管理认证、文档上传更新、向量索引重建与后台配置。</p>
+        </section>
+
+        <section class="admin-grid">
+            <article class="admin-card">
+                <h2>管理员登录</h2>
+                <form id="loginForm" class="admin-form">
+                    <label>
+                        用户名
+                        <input id="loginUsername" type="text" value="admin" required>
+                    </label>
+                    <label>
+                        密码
+                        <input id="loginPassword" type="password" value="admin123456" required>
+                    </label>
+                    <div class="admin-actions">
+                        <button type="submit">登录</button>
+                        <button id="logoutBtn" type="button" class="ghost">登出</button>
+                    </div>
+                </form>
+                <p id="authStatus" class="status-text">未登录</p>
+            </article>
+
+            <article class="admin-card">
+                <h2>索引控制</h2>
+                <p>触发全量向量索引重建。</p>
+                <div class="admin-actions">
+                    <button id="rebuildBtn" type="button">立即重建索引</button>
+                </div>
+                <p id="rebuildStatus" class="status-text"></p>
+            </article>
+
+            <article class="admin-card span-2">
+                <h2>文档上传</h2>
+                <form id="uploadForm" class="admin-form">
+                    <div class="form-row">
+                        <label>
+                            项目
+                            <input id="uploadProject" type="text" value="custom">
+                        </label>
+                        <label>
+                            相对路径（可选）
+                            <input id="uploadRelativePath" type="text" placeholder="guide/new-doc.md">
+                        </label>
+                    </div>
+                    <label>
+                        文档文件
+                        <input id="uploadFile" type="file" required>
+                    </label>
+                    <label class="checkbox-row">
+                        <input id="uploadAutoReindex" type="checkbox" checked>
+                        自动重建向量索引
+                    </label>
+                    <div class="admin-actions">
+                        <button type="submit">上传文档</button>
+                    </div>
+                </form>
+                <p id="uploadStatus" class="status-text"></p>
+            </article>
+
+            <article class="admin-card span-2">
+                <h2>文档编辑</h2>
+                <form id="editorForm" class="admin-form">
+                    <div class="form-row">
+                        <label>
+                            项目
+                            <input id="editorProject" type="text" value="custom" required>
+                        </label>
+                        <label>
+                            相对路径
+                            <input id="editorRelativePath" type="text" placeholder="guide/new-doc.md" required>
+                        </label>
+                    </div>
+                    <label>
+                        文档内容
+                        <textarea id="editorContent" rows="12" placeholder="# 标题&#10;正文内容..." required></textarea>
+                    </label>
+                    <label class="checkbox-row">
+                        <input id="editorAutoReindex" type="checkbox" checked>
+                        保存时自动重建向量索引
+                    </label>
+                    <div class="admin-actions">
+                        <button type="submit">保存文档</button>
+                        <button id="deleteDocBtn" type="button" class="danger">删除文档</button>
+                    </div>
+                </form>
+                <p id="editorStatus" class="status-text"></p>
+            </article>
+
+            <article class="admin-card">
+                <h2>配置管理</h2>
+                <form id="configForm" class="admin-form">
+                    <label class="checkbox-row">
+                        <input id="cfgAutoReindex" type="checkbox">
+                        文档变更后自动重建
+                    </label>
+                    <label>
+                        默认项目
+                        <input id="cfgDefaultProject" type="text">
+                    </label>
+                    <label>
+                        允许扩展名（逗号分隔）
+                        <input id="cfgExtensions" type="text">
+                    </label>
+                    <label>
+                        上传大小上限（KB）
+                        <input id="cfgMaxUpload" type="number" min="1" max="10240">
+                    </label>
+                    <div class="admin-actions">
+                        <button id="loadConfigBtn" type="button" class="ghost">读取配置</button>
+                        <button type="submit">保存配置</button>
+                    </div>
+                </form>
+                <p id="configStatus" class="status-text"></p>
+            </article>
+
+            <article class="admin-card">
+                <h2>文档列表</h2>
+                <div class="admin-actions">
+                    <button id="refreshDocsBtn" type="button" class="ghost">刷新列表</button>
+                </div>
+                <ul id="docsList" class="docs-list"></ul>
+            </article>
+        </section>
+    </main>
+
+    <script src="js/main.js"></script>
+    <script src="js/admin.js?v=20260226a"></script>
+</body>
+</html>

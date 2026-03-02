@@ -37,8 +37,3 @@ class SearchResult(BaseModel):
 class SearchResponse(BaseModel):
     success: bool
     results: List[SearchResult] = Field(default_factory=list)
-
-
-class StatsResponse(BaseModel):
-    success: bool
-    stats: Dict[str, Any] = Field(default_factory=dict)

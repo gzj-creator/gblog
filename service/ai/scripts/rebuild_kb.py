@@ -29,7 +29,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--docs-output-dir",
-        default="repos",
+        default="service/ai/managed_docs",
         help="Output directory for generated markdown docs (relative to repo root)",
     )
     args = parser.parse_args()

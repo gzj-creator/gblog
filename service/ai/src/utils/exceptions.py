@@ -40,3 +40,10 @@ class ServiceUnavailableError(AIServiceError):
 
     def __init__(self, message: str = "Service unavailable"):
         super().__init__(message, status_code=503)
+
+
+class AuthenticationError(AIServiceError):
+    """鉴权失败"""
+
+    def __init__(self, message: str = "Authentication failed"):
+        super().__init__(message, status_code=401)

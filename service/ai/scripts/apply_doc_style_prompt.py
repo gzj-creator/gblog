@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Apply unified style prompt to Galay repo docs."""
+"""Apply unified style prompt to managed docs for AI indexing."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from pathlib import Path
 from typing import Iterable, List
@@ -11,6 +12,7 @@ from typing import Iterable, List
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parents[2]
+DEFAULT_DOCS_ROOT = REPO_ROOT / "service/ai/managed_docs"
 
 OPEN_FENCE_RE = re.compile(r"^```([A-Za-z0-9_+-]*)\s*$")
 HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$")
@@ -43,8 +45,28 @@ INSTALL_SECTION = (
 )
 
 
+def _resolve_docs_root() -> Path:
+    raw = os.getenv("GALAY_DOCS_ROOT_PATH", "service/ai/managed_docs")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    return path
+
+
+DOCS_ROOT = _resolve_docs_root()
+
+
 def _iter_targets() -> Iterable[Path]:
-    yield from sorted(REPO_ROOT.glob("repos/galay-*/**/*.md"))
+    if not DOCS_ROOT.exists():
+        return
+    yield from sorted(DOCS_ROOT.glob("**/*.md"))
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def _infer_language(block_lines: List[str], heading: str) -> str:
@@ -146,9 +168,9 @@ def _normalize_fences(text: str) -> str:
 def _ensure_install_section(text: str, file_path: Path) -> str:
     if file_path.name != "README.md":
         return text
-    # Only apply this template to top-level repo README:
-    # repos/galay-*/README.md
-    if file_path.parent.parent.name != "repos":
+    # Only apply this template to top-level project README under docs root:
+    # <docs-root>/<project>/README.md
+    if file_path.parent.parent != DOCS_ROOT:
         return text
     if file_path.parent.name == "galay-ecosystem":
         return text
@@ -176,7 +198,7 @@ def _normalize_text(text: str, file_path: Path) -> str:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Apply unified style prompt to repos docs")
+    parser = argparse.ArgumentParser(description="Apply unified style prompt to managed docs")
     parser.add_argument("--check", action="store_true", help="Check only, do not write files")
     args = parser.parse_args()
 
@@ -192,8 +214,10 @@ def main() -> int:
         changed += 1
         if not args.check:
             file_path.write_text(updated, encoding="utf-8")
-        print(f"[style] {'would update' if args.check else 'updated'}: {file_path.relative_to(REPO_ROOT)}")
+        action = "would update" if args.check else "updated"
+        print(f"[style] {action}: {_display_path(file_path)}")
 
+    print(f"[style] docs_root={_display_path(DOCS_ROOT)}")
     print(f"[style] summary changed={changed} unchanged={unchanged}")
     return 1 if args.check and changed > 0 else 0
 

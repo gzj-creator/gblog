@@ -140,7 +140,7 @@ def main() -> int:
     parser.add_argument(
         "--targets",
         nargs="+",
-        default=["repos", "frontend", "service"],
+        default=["service/ai/managed_docs", "frontend", "service"],
         help="Relative paths to scan",
     )
     args = parser.parse_args()

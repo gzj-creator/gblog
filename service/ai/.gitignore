@@ -8,6 +8,8 @@ data/
 logs/
 *.log
 vector_store/
+managed_docs/
+runtime/
 .DS_Store
 *.egg-info/
 dist/

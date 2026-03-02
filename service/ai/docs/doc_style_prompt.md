@@ -10,9 +10,9 @@
 
 ## 适用范围
 
-- `repos/galay-*/README.md`
-- `repos/galay-*/docs/**/*.md`
-- 显式排除：`repos/galay-*/.claude/**`、`repos/galay-*/todo/**`
+- `service/ai/managed_docs/galay-*/README.md`
+- `service/ai/managed_docs/galay-*/docs/**/*.md`
+- 显式排除：`service/ai/managed_docs/galay-*/.claude/**`、`service/ai/managed_docs/galay-*/todo/**`
 
 ## 统一输出规则
 

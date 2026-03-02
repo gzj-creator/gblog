@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Verify repos docs follow unified style prompt."""
+"""Verify managed docs follow unified style prompt."""
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 from typing import Iterable, List
@@ -14,8 +15,28 @@ REPO_ROOT = SCRIPT_DIR.parents[2]
 OPEN_FENCE_RE = re.compile(r"^```([A-Za-z0-9_+-]*)\s*$")
 
 
+def _resolve_docs_root() -> Path:
+    raw = os.getenv("GALAY_DOCS_ROOT_PATH", "service/ai/managed_docs")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = REPO_ROOT / path
+    return path
+
+
+DOCS_ROOT = _resolve_docs_root()
+
+
 def _iter_repo_markdown() -> Iterable[Path]:
-    yield from sorted(REPO_ROOT.glob("repos/galay-*/**/*.md"))
+    if not DOCS_ROOT.exists():
+        return
+    yield from sorted(DOCS_ROOT.glob("**/*.md"))
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
 
 
 def _check_fence_openings(text: str) -> List[str]:
@@ -46,9 +67,9 @@ def _check_fence_openings(text: str) -> List[str]:
 def _check_install_sections(path: Path, text: str) -> List[str]:
     if path.name != "README.md":
         return []
-    # Only enforce install section for top-level repo README:
-    # repos/galay-*/README.md
-    if path.parent.parent.name != "repos":
+    # Only enforce install section for top-level project README under docs root:
+    # <docs-root>/<project>/README.md
+    if path.parent.parent != DOCS_ROOT:
         return []
     if path.parent.name == "galay-ecosystem":
         return []
@@ -69,8 +90,8 @@ def main() -> int:
     problems: List[str] = []
     files = list(_iter_repo_markdown())
     if not files:
-        print("[verify_docs_prompt_style] ERROR: no repo README files found")
-        return 1
+        print(f"[verify_docs_prompt_style] WARN: no markdown files found under {_display_path(DOCS_ROOT)}")
+        return 0
 
     for file_path in files:
         text = file_path.read_text(encoding="utf-8", errors="ignore")
@@ -78,9 +99,9 @@ def main() -> int:
         issues.extend(_check_install_sections(file_path, text))
         issues.extend(_check_fence_openings(text))
         if issues:
-            problems.append(f"- {file_path.relative_to(REPO_ROOT)}: {'; '.join(issues)}")
+            problems.append(f"- {_display_path(file_path)}: {'; '.join(issues)}")
 
-    print(f"[verify_docs_prompt_style] files={len(files)} problem_files={len(problems)}")
+    print(f"[verify_docs_prompt_style] docs_root={_display_path(DOCS_ROOT)} files={len(files)} problem_files={len(problems)}")
     if problems:
         for row in problems:
             print(row)

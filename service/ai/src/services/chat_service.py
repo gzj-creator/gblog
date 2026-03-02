@@ -2,6 +2,7 @@ from collections import OrderedDict
 from pathlib import Path
 import re
 from typing import Any, AsyncGenerator, Dict, List
+from urllib.parse import quote
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -124,11 +125,31 @@ _CPP_LANGS = {"cpp", "c++", "cc", "cxx", "hpp", "h"}
 _COMMAND_FENCE_LANGS = {"bash", "shell", "sh", "zsh", "cmake", "text", "plaintext"}
 _FENCED_CODE_BLOCK_RE = re.compile(r"(?ms)```.*?```")
 _CPP_RAW_STRING_START_RE = re.compile(r'R"(?P<delim>[A-Za-z_][A-Za-z0-9_]{0,15}|)\(')
-_UNHANDLED_SEND_COAWAIT_LINE_RE = re.compile(
-    r"^(?P<indent>\s*)co_await\s+(?P<expr>.+?(?:\.|->)\s*"
-    r"(?:send|sendResponse|sendRequest|sendText|sendBinary|sendPing|sendPong)"
-    r"\s*\(.*\))\s*;\s*$"
+_UNHANDLED_COAWAIT_LINE_RE = re.compile(
+    r"^(?P<indent>\s*)co_await\s+(?P<expr>.+?)\s*;\s*$"
 )
+_LIKELY_VOID_COAWAIT_EXPR_RE = re.compile(
+    r"(?:\.|->)\s*(?:wait|close|shutdown|stop)\s*\(",
+    re.IGNORECASE,
+)
+_SETUP_INTENT_RE = re.compile(
+    r"(安装|环境|依赖|构建|编译|运行|启动|部署|快速开始|入门|教程|步骤|怎么开始|如何开始|从零)",
+    re.IGNORECASE,
+)
+_FOLLOW_UP_QUERY_RE = re.compile(
+    r"(呢[？?]?$|还有|另外|那(么)?|然后|顺便|同理|也(支持|可以)?|再说|这个|那个)",
+    re.IGNORECASE,
+)
+_SETUP_SECTION_TITLE_RE = re.compile(
+    r"^(?:#{1,6}\s*|\d+\.\s*)\s*(?:环境要求|安装步骤|运行与验证|构建|编译运行|依赖)\s*$",
+    re.IGNORECASE,
+)
+_MARKDOWN_SECTION_BOUNDARY_RE = re.compile(
+    r"^(?:#{1,6}\s+.+|\d+\.\s+.+)$"
+)
+_IMPORT_REQUEST_RE = re.compile(r"(?:\bimport\b|模块|module|命名模块)", re.IGNORECASE)
+_INCLUDE_REQUEST_RE = re.compile(r"(?:#include|include 版本|头文件)", re.IGNORECASE)
+_REF_SECTION_TITLE_RE = re.compile(r"^(?:#{1,6}\s*)?(?:参考来源|引用来源)\s*[:：]?\s*$", re.IGNORECASE)
 _GALAY_INCLUDE_PREFIX_TO_MODULE = (
     ("galay-kernel/", "galay.kernel"),
     ("galay-ssl/", "galay.ssl"),
@@ -170,6 +191,9 @@ class ChatService:
         # session_id -> List[{"role": "user"|"assistant", "content": str}]
         self._histories: OrderedDict[str, List[dict]] = OrderedDict()
 
+    def on_index_reloaded(self) -> None:
+        self._rag.invalidate_cache()
+
     # ------------------------------------------------------------------
     # 公开接口
     # ------------------------------------------------------------------
@@ -179,10 +203,12 @@ class ChatService:
             docs_with_score = self._rag.retrieve_with_score(message, k=4)
             docs = [doc for doc, _ in docs_with_score]
             sources = _extract_sources(docs)
+            history_snapshot = list(self._histories.get(session_id, []))
             messages = self._build_messages(message, docs, session_id)
 
             response = self._llm.invoke(messages)
-            answer = _normalize_answer_text(_extract_message_text(response))
+            answer = _normalize_answer_text(_extract_message_text(response), user_message=message)
+            answer = _prune_setup_sections_for_followup(answer, message, history_snapshot)
             answer = _downgrade_answer_when_example_missing(answer, message, docs)
             answer = _enforce_confidence_gate_for_code(answer, message, docs_with_score)
             answer = _ensure_source_citations(answer, docs)
@@ -211,6 +237,7 @@ class ChatService:
             docs_with_score = self._rag.retrieve_with_score(message, k=4)
             docs = [doc for doc, _ in docs_with_score]
             sources = _extract_sources(docs)
+            history_snapshot = list(self._histories.get(session_id, []))
             messages = self._build_messages(message, docs, session_id)
 
             raw_answer_parts: List[str] = []
@@ -229,7 +256,7 @@ class ChatService:
                             break
                         emitted_any = True
                         streamed_parts.append(emit_piece)
-                        partial_text, partial_blocks = _build_stream_preview(streamed_parts)
+                        partial_text, partial_blocks = _build_stream_preview(streamed_parts, user_message=message)
                         if partial_text:
                             yield {"replace": partial_text, "blocks": partial_blocks, "partial": True}
                         else:
@@ -240,7 +267,8 @@ class ChatService:
                 # 部分 OpenAI 兼容实现可能在 stream 中不给 content，兜底一次同步调用。
                 fallback = self._llm.invoke(messages)
                 raw_answer = _extract_message_text(fallback).strip()
-                normalized_answer = _normalize_answer_text(raw_answer)
+                normalized_answer = _normalize_answer_text(raw_answer, user_message=message)
+                normalized_answer = _prune_setup_sections_for_followup(normalized_answer, message, history_snapshot)
                 normalized_answer = _downgrade_answer_when_example_missing(normalized_answer, message, docs)
                 normalized_answer = _enforce_confidence_gate_for_code(normalized_answer, message, docs_with_score)
                 normalized_answer = _ensure_source_citations(normalized_answer, docs)
@@ -254,13 +282,14 @@ class ChatService:
                 if tail_piece:
                     emitted_any = True
                     streamed_parts.append(tail_piece)
-                    partial_text, partial_blocks = _build_stream_preview(streamed_parts)
+                    partial_text, partial_blocks = _build_stream_preview(streamed_parts, user_message=message)
                     if partial_text:
                         yield {"replace": partial_text, "blocks": partial_blocks, "partial": True}
                     else:
                         yield {"content": tail_piece}
 
-                normalized_answer = _normalize_answer_text(raw_answer)
+                normalized_answer = _normalize_answer_text(raw_answer, user_message=message)
+                normalized_answer = _prune_setup_sections_for_followup(normalized_answer, message, history_snapshot)
                 normalized_answer = _downgrade_answer_when_example_missing(normalized_answer, message, docs)
                 normalized_answer = _enforce_confidence_gate_for_code(normalized_answer, message, docs_with_score)
                 normalized_answer = _ensure_source_citations(normalized_answer, docs)
@@ -295,7 +324,7 @@ class ChatService:
                     "blocks": _build_answer_blocks("抱歉，我在文档中没有找到相关信息。请尝试换个方式提问。"),
                     "sources": [],
                 }
-            answer = _normalize_answer_text(self._rag.generate(message, docs))
+            answer = _normalize_answer_text(self._rag.generate(message, docs), user_message=message)
             answer = _downgrade_answer_when_example_missing(answer, message, docs)
             answer = _enforce_confidence_gate_for_code(answer, message, docs_with_score)
             answer = _ensure_source_citations(answer, docs)
@@ -321,10 +350,16 @@ class ChatService:
         """构建 LLM 消息列表：system + context + history + user"""
         context = format_context_docs(docs)
         guardrail = ""
+        history = self._histories.get(session_id, [])
         if is_usage_query(message) and not has_example_source(docs):
             guardrail = (
                 "\n补充约束：当前检索上下文没有命中 demo/example/test/快速开始等示例来源。"
                 "不要输出未被示例验证的 API 写法；若示例未覆盖，请明确说明。"
+            )
+        if _is_follow_up_question(message, history) and not _has_setup_intent(message):
+            guardrail += (
+                "\n补充约束：这是对上一轮的追问。默认沿用上一轮已给出的环境要求和安装步骤，"
+                "除非用户明确要求重述；回答只保留与本次追问直接相关的新增信息。"
             )
 
         system_content = f"""{SYSTEM_PROMPT}
@@ -337,7 +372,6 @@ class ChatService:
         messages = [SystemMessage(content=system_content)]
 
         # 追加历史对话
-        history = self._histories.get(session_id, [])
         for entry in history:
             if entry["role"] == "user":
                 messages.append(HumanMessage(content=entry["content"]))
@@ -427,16 +461,30 @@ def _coerce_text(value: Any) -> str:
     return str(value)
 
 
-def _normalize_answer_text(raw: str, *, finalize_examples: bool = True) -> str:
+def _normalize_answer_text(
+    raw: str,
+    *,
+    finalize_examples: bool = True,
+    user_message: str = "",
+) -> str:
     """统一规范模型输出，保证与入库文档一致的 markdown 规则。"""
     if not raw:
         return ""
 
     normalized = normalize_markdown_content(str(raw), target="answer", strip_decorative=True)
-    return _enforce_framework_output_consistency(normalized, finalize_examples=finalize_examples)
+    return _enforce_framework_output_consistency(
+        normalized,
+        finalize_examples=finalize_examples,
+        user_message=user_message,
+    )
 
 
-def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool = True) -> str:
+def _enforce_framework_output_consistency(
+    text: str,
+    *,
+    finalize_examples: bool = True,
+    user_message: str = "",
+) -> str:
     if not text:
         return ""
 
@@ -514,19 +562,17 @@ def _enforce_framework_output_consistency(text: str, *, finalize_examples: bool 
         )
 
     if finalize_examples:
-        dual_mode_fixed, dual_mode_rewritten = _ensure_dual_cpp_example_modes(fixed)
-        if dual_mode_rewritten:
-            fixed = dual_mode_fixed
+        mode_fixed, mode_rewritten = _enforce_cpp_example_mode(fixed, user_message)
+        if mode_rewritten:
+            fixed = mode_fixed
             changed = True
-            notes.append(
-                "说明：代码示例已补齐 `#include` 与 `import` 双范式，便于在传统头文件模式与 C++23 模块模式间切换。"
-            )
+            notes.append("说明：代码示例已按用户偏好输出单一范式（默认 include，按需 import）。")
 
-    coawait_fixed, coawait_rewritten = _rewrite_unhandled_send_coawait_returns(fixed)
+    coawait_fixed, coawait_rewritten = _rewrite_unhandled_coawait_returns(fixed)
     if coawait_rewritten:
         fixed = coawait_fixed
         changed = True
-        notes.append("说明：`co_await` 发送调用已显式处理返回值。")
+        notes.append("说明：`co_await` 调用已显式处理返回值（或标注 void 场景）。")
 
     reindented, cpp_reindented = _reindent_cpp_fenced_blocks(fixed)
     if cpp_reindented:
@@ -828,6 +874,85 @@ def _ensure_http_dependency_steps(text: str) -> tuple[str, bool]:
     return fixed, fixed != before
 
 
+def _user_requests_import_mode(message: str) -> bool:
+    text = str(message or "")
+    if not text.strip():
+        return False
+    wants_import = bool(_IMPORT_REQUEST_RE.search(text))
+    wants_include = bool(_INCLUDE_REQUEST_RE.search(text))
+    return wants_import and not wants_include
+
+
+def _drop_named_variant_section(text: str, *, mode: str) -> tuple[str, bool]:
+    if mode == "import":
+        title_pattern = r"(?:使用\s*import\s*方式|import\s*版本)"
+    else:
+        title_pattern = r"(?:使用\s*#?\s*include\s*方式|include\s*版本)"
+    pattern = re.compile(
+        rf"(?mis)\n*(?:#{1,6}\s*)?{title_pattern}\s*\n+```(?:[A-Za-z0-9_+\-]*)\n.*?\n```"
+    )
+    fixed = pattern.sub("\n", text)
+    fixed = re.sub(r"\n{3,}", "\n\n", fixed).strip()
+    return fixed, fixed != text
+
+
+def _replace_first_cpp_block(text: str, new_code: str, *, language: str = "cpp") -> tuple[str, bool]:
+    for match in _CPP_FENCE_BLOCK_RE.finditer(text):
+        lang = (match.group("lang") or "").strip().lower()
+        code = str(match.group("code") or "")
+        if lang not in _CPP_LANGS and not (not lang and _looks_like_cpp_snippet(code)):
+            continue
+        normalized_lang = language if language else (lang or "cpp")
+        replacement = f"```{normalized_lang}\n{new_code}\n```"
+        fixed = text[: match.start()] + replacement + text[match.end() :]
+        return fixed, fixed != text
+    return text, False
+
+
+def _enforce_cpp_example_mode(text: str, user_message: str) -> tuple[str, bool]:
+    if not text:
+        return text, False
+
+    prefer_import = _user_requests_import_mode(user_message)
+    cpp_blocks = _extract_cpp_blocks(text)
+    if not cpp_blocks:
+        return text, False
+
+    include_code = next((code for code in cpp_blocks if _contains_galay_include(code)), "")
+    import_code = next((code for code in cpp_blocks if _contains_galay_import(code)), "")
+    fixed = text
+    changed = False
+
+    if prefer_import:
+        if include_code and import_code:
+            dropped, drop_changed = _drop_named_variant_section(fixed, mode="include")
+            if drop_changed:
+                fixed = dropped
+                changed = True
+        elif include_code and not import_code:
+            import_variant = _build_import_variant_from_include(include_code)
+            if import_variant:
+                replaced, replace_changed = _replace_first_cpp_block(fixed, import_variant, language="cpp")
+                if replace_changed:
+                    fixed = replaced
+                    changed = True
+    else:
+        if include_code and import_code:
+            dropped, drop_changed = _drop_named_variant_section(fixed, mode="import")
+            if drop_changed:
+                fixed = dropped
+                changed = True
+        elif import_code and not include_code:
+            include_variant = _build_include_variant_from_import(import_code)
+            if include_variant:
+                replaced, replace_changed = _replace_first_cpp_block(fixed, include_variant, language="cpp")
+                if replace_changed:
+                    fixed = replaced
+                    changed = True
+
+    return fixed, changed
+
+
 def _ensure_dual_cpp_example_modes(text: str) -> tuple[str, bool]:
     cpp_blocks = _extract_cpp_blocks(text)
     if not cpp_blocks:
@@ -984,7 +1109,7 @@ def _reindent_cpp_fenced_blocks(text: str) -> tuple[str, bool]:
     return fixed, changed
 
 
-def _rewrite_unhandled_send_coawait_returns(text: str) -> tuple[str, bool]:
+def _rewrite_unhandled_coawait_returns(text: str) -> tuple[str, bool]:
     changed = False
     counter = 0
 
@@ -994,18 +1119,23 @@ def _rewrite_unhandled_send_coawait_returns(text: str) -> tuple[str, bool]:
         output: List[str] = []
         local_changed = False
         for raw in lines:
-            match = _UNHANDLED_SEND_COAWAIT_LINE_RE.match(raw)
+            match = _UNHANDLED_COAWAIT_LINE_RE.match(raw)
             if not match:
                 output.append(raw)
                 continue
 
             indent = match.group("indent")
             expr = match.group("expr").strip()
+            if _LIKELY_VOID_COAWAIT_EXPR_RE.search(expr):
+                output.append(f"{indent}co_await {expr};  // explicit await for completion (void result)")
+                local_changed = True
+                continue
+
             counter += 1
-            var_name = f"send_result_{counter}"
+            var_name = f"await_result_{counter}"
             output.append(f"{indent}auto {var_name} = co_await {expr};")
             output.append(f"{indent}if (!{var_name}) {{")
-            output.append(f"{indent}    // TODO: handle send failure")
+            output.append(f"{indent}    // TODO: handle await failure")
             output.append(f"{indent}}}")
             local_changed = True
         return "\n".join(output), local_changed
@@ -1151,13 +1281,17 @@ def _build_answer_blocks(text: str) -> List[Dict[str, Any]]:
         return [{"type": "paragraph", "text": text}]
 
 
-def _build_stream_preview(streamed_parts: List[str]) -> tuple[str, List[Dict[str, Any]]]:
+def _build_stream_preview(
+    streamed_parts: List[str],
+    *,
+    user_message: str = "",
+) -> tuple[str, List[Dict[str, Any]]]:
     if not streamed_parts:
         return "", []
     preview_raw = "".join(streamed_parts).strip()
     if not preview_raw:
         return "", []
-    preview_text = _normalize_answer_text(preview_raw, finalize_examples=False)
+    preview_text = _normalize_answer_text(preview_raw, finalize_examples=False, user_message=user_message)
     if not preview_text:
         return "", []
     return preview_text, _build_answer_blocks(preview_text)
@@ -1280,6 +1414,67 @@ def _downgrade_answer_when_example_missing(answer: str, message: str, docs: list
     if note not in stripped:
         stripped = f"{stripped.rstrip()}\n\n{note}"
     return stripped
+
+
+def _has_setup_intent(message: str) -> bool:
+    return bool(_SETUP_INTENT_RE.search(str(message or "")))
+
+
+def _is_follow_up_question(message: str, history: List[dict]) -> bool:
+    if not history:
+        return False
+    text = str(message or "").strip()
+    if not text:
+        return False
+    if _has_setup_intent(text):
+        return False
+    if _FOLLOW_UP_QUERY_RE.search(text):
+        return True
+    return len(text) <= 24
+
+
+def _prune_setup_sections_for_followup(answer: str, message: str, history: List[dict]) -> str:
+    if not answer:
+        return answer
+    if not _is_follow_up_question(message, history):
+        return answer
+    if _has_setup_intent(message):
+        return answer
+
+    lines = str(answer).split("\n")
+    kept: List[str] = []
+    skip_section = False
+    in_fence = False
+
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx]
+        stripped = line.strip()
+        is_fence = stripped.startswith("```")
+
+        if skip_section:
+            if is_fence:
+                in_fence = not in_fence
+                idx += 1
+                continue
+            if not in_fence and _MARKDOWN_SECTION_BOUNDARY_RE.match(stripped):
+                skip_section = False
+                continue
+            idx += 1
+            continue
+
+        if _SETUP_SECTION_TITLE_RE.match(stripped):
+            skip_section = True
+            in_fence = False
+            idx += 1
+            continue
+
+        kept.append(line)
+        idx += 1
+
+    cleaned = "\n".join(kept)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
+    return cleaned if cleaned else answer
 
 
 def _strip_decorative_symbols(text: str) -> str:

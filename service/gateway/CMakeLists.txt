@@ -22,6 +22,7 @@ add_executable(static-server
 target_link_libraries(static-server
     PRIVATE
         GalayHttp::GalayHttp
+        spdlog::spdlog
         Threads::Threads
 )
 

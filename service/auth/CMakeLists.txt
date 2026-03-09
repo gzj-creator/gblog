@@ -27,6 +27,7 @@ add_executable(auth-server
 target_link_libraries(auth-server
     PRIVATE
         GalayHttp::GalayHttp
+        spdlog::spdlog
         OpenSSL::Crypto
         Threads::Threads
 )

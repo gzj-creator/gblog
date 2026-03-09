@@ -30,6 +30,7 @@ add_executable(db-server
 target_link_libraries(db-server
     PRIVATE
         GalayHttp::GalayHttp
+        spdlog::spdlog
         galay-mysql::galay-mysql
         Threads::Threads
 )

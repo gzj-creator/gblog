@@ -5,6 +5,7 @@
 
 #include <openssl/sha.h>
 
+#include <chrono>
 #include <cctype>
 #include <iomanip>
 #include <sstream>

@@ -24,6 +24,7 @@ add_executable(backend-server
 target_link_libraries(backend-server
     PRIVATE
         GalayHttp::GalayHttp
+        spdlog::spdlog
         Threads::Threads
 )
 
@@ -50,6 +51,7 @@ if(BUILD_TESTS AND EXISTS ${CMAKE_SOURCE_DIR}/test)
         target_link_libraries(${TEST_NAME}
             PRIVATE
                 GalayHttp::GalayHttp
+                spdlog::spdlog
                 Threads::Threads
         )
 

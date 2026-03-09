@@ -9,7 +9,7 @@
 #include "galay-http/protoc/http/HttpResponse.h"
 #include "galay-http/utils/Http1_1RequestBuilder.h"
 #include "galay-kernel/kernel/Runtime.h"
-#include "galay-kernel/common/Log.h"
+#include "galay-http/kernel/http/HttpLog.h"
 #include <iostream>
 #include <fstream>
 #include <chrono>
@@ -25,15 +25,16 @@ void writeTestResult(const std::string& testName, bool passed, const std::string
     file.close();
 
     if (passed) {
-        LogInfo("[PASS] {}: {}", testName, message);
+        HTTP_LOG_INFO("[PASS] {}: {}", testName, message);
     } else {
-        LogError("[FAIL] {}: {}", testName, message);
+        HTTP_LOG_ERROR("[FAIL] {}: {}", testName, message);
     }
 }
 
 // 测试健康检查接口
 Coroutine testHealthApi(Runtime& runtime) {
-    LogInfo("Testing /api/health endpoint...");
+    (void)runtime;
+    HTTP_LOG_INFO("Testing /api/health endpoint...");
 
     HttpClient client;
     auto connectResult = co_await client.connect("http://127.0.0.1:8080");
@@ -43,10 +44,12 @@ Coroutine testHealthApi(Runtime& runtime) {
         co_return;
     }
 
+    auto session = client.getSession();
+
     // 发送 GET 请求
     bool complete = false;
     while (!complete) {
-        auto result = co_await client.get("/api/health");
+        auto result = co_await session.get("/api/health");
 
         if (!result) {
             writeTestResult("Health API", false, "Request failed");
@@ -81,7 +84,8 @@ Coroutine testHealthApi(Runtime& runtime) {
 
 // 测试项目列表接口
 Coroutine testProjectsApi(Runtime& runtime) {
-    LogInfo("Testing /api/projects endpoint...");
+    (void)runtime;
+    HTTP_LOG_INFO("Testing /api/projects endpoint...");
 
     HttpClient client;
     auto connectResult = co_await client.connect("http://127.0.0.1:8080");
@@ -91,9 +95,11 @@ Coroutine testProjectsApi(Runtime& runtime) {
         co_return;
     }
 
+    auto session = client.getSession();
+
     bool complete = false;
     while (!complete) {
-        auto result = co_await client.get("/api/projects");
+        auto result = co_await session.get("/api/projects");
 
         if (!result) {
             writeTestResult("Projects API", false, "Request failed");
@@ -134,7 +140,8 @@ Coroutine testProjectsApi(Runtime& runtime) {
 
 // 测试单个项目详情接口
 Coroutine testProjectDetailApi(Runtime& runtime) {
-    LogInfo("Testing /api/projects/:id endpoint...");
+    (void)runtime;
+    HTTP_LOG_INFO("Testing /api/projects/:id endpoint...");
 
     HttpClient client;
     auto connectResult = co_await client.connect("http://127.0.0.1:8080");
@@ -144,9 +151,11 @@ Coroutine testProjectDetailApi(Runtime& runtime) {
         co_return;
     }
 
+    auto session = client.getSession();
+
     bool complete = false;
     while (!complete) {
-        auto result = co_await client.get("/api/projects/kernel");
+        auto result = co_await session.get("/api/projects/kernel");
 
         if (!result) {
             writeTestResult("Project Detail API", false, "Request failed");
@@ -185,7 +194,8 @@ Coroutine testProjectDetailApi(Runtime& runtime) {
 
 // 测试 404 响应
 Coroutine testNotFoundApi(Runtime& runtime) {
-    LogInfo("Testing 404 response...");
+    (void)runtime;
+    HTTP_LOG_INFO("Testing 404 response...");
 
     HttpClient client;
     auto connectResult = co_await client.connect("http://127.0.0.1:8080");
@@ -195,9 +205,11 @@ Coroutine testNotFoundApi(Runtime& runtime) {
         co_return;
     }
 
+    auto session = client.getSession();
+
     bool complete = false;
     while (!complete) {
-        auto result = co_await client.get("/api/projects/nonexistent");
+        auto result = co_await session.get("/api/projects/nonexistent");
 
         if (!result) {
             writeTestResult("404 Response", false, "Request failed");
@@ -227,9 +239,9 @@ Coroutine testNotFoundApi(Runtime& runtime) {
 
 // 运行所有测试
 Coroutine runAllTests(Runtime& runtime) {
-    LogInfo("============================================");
-    LogInfo("Starting Blog Server API Tests");
-    LogInfo("============================================");
+    HTTP_LOG_INFO("============================================");
+    HTTP_LOG_INFO("Starting Blog Server API Tests");
+    HTTP_LOG_INFO("============================================");
 
     // 清空测试结果文件
     std::ofstream file("test_results.txt", std::ios::trunc);
@@ -240,23 +252,26 @@ Coroutine runAllTests(Runtime& runtime) {
     // 等待服务器启动
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    co_await testHealthApi(runtime);
-    co_await testProjectsApi(runtime);
-    co_await testProjectDetailApi(runtime);
-    co_await testNotFoundApi(runtime);
+    co_await testHealthApi(runtime).wait();
+    co_await testProjectsApi(runtime).wait();
+    co_await testProjectDetailApi(runtime).wait();
+    co_await testNotFoundApi(runtime).wait();
 
-    LogInfo("============================================");
-    LogInfo("All tests completed. See test_results.txt");
-    LogInfo("============================================");
+    HTTP_LOG_INFO("============================================");
+    HTTP_LOG_INFO("All tests completed. See test_results.txt");
+    HTTP_LOG_INFO("============================================");
 
     co_return;
 }
 
 int main() {
-    LogInfo("Blog Server API Test Client");
-    LogInfo("Make sure the server is running on port 8080");
+    HTTP_LOG_INFO("Blog Server API Test Client");
+    HTTP_LOG_INFO("Make sure the server is running on port 8080");
 
-    Runtime runtime(LoadBalanceStrategy::ROUND_ROBIN, 1, 1);
+    RuntimeConfig config;
+    config.io_scheduler_count = 1;
+    config.compute_scheduler_count = 1;
+    Runtime runtime(config);
     runtime.start();
 
     auto* scheduler = runtime.getNextIOScheduler();

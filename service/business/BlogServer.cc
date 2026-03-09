@@ -9,10 +9,10 @@
 
 #include "galay-http/kernel/http/HttpRouter.h"
 #include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpLog.h"
 #include "galay-http/protoc/http/HttpRequest.h"
 #include "galay-http/protoc/http/HttpResponse.h"
 #include "galay-http/utils/Http1_1ResponseBuilder.h"
-#include "galay-kernel/common/Log.h"
 
 #include <atomic>
 #include <chrono>
@@ -42,7 +42,7 @@ static AuthService g_auth_service;
 
 void signalHandler(int signum)
 {
-    LogInfo("Received signal {}, shutting down...", signum);
+    HTTP_LOG_INFO("Received signal {}, shutting down...", signum);
     g_running = false;
     if (g_server) {
         g_server->stop();
@@ -708,9 +708,9 @@ int main(int argc, char* argv[])
     std::signal(SIGINT, signalHandler);
     std::signal(SIGTERM, signalHandler);
 
-    LogInfo("============================================");
-    LogInfo("       Galay Blog Server v1.0.0");
-    LogInfo("============================================");
+    HTTP_LOG_INFO("============================================");
+    HTTP_LOG_INFO("       Galay Blog Server v1.0.0");
+    HTTP_LOG_INFO("============================================");
 
     HttpRouter router;
     registerDbRoutes(router);
@@ -723,31 +723,31 @@ int main(int argc, char* argv[])
 
     if (!staticDir.empty()) {
         if (!std::filesystem::exists(staticDir) || !std::filesystem::is_directory(staticDir)) {
-            LogWarn("Static directory not found, static mount skipped: {}", staticDir);
+            HTTP_LOG_WARN("Static directory not found, static mount skipped: {}", staticDir);
         } else {
             router.mount("/", staticDir, staticConfig);
-            LogInfo("Static files: {}", staticDir);
+            HTTP_LOG_INFO("Static files: {}", staticDir);
         }
     } else {
-        LogInfo("Static files: disabled");
+        HTTP_LOG_INFO("Static files: disabled");
     }
 
-    LogInfo("Service split: AuthService + DbService");
-    LogInfo("API endpoints:");
-    LogInfo("  GET /health, /projects, /projects/:id, /posts, /posts/:id, /docs, /docs/:id");
-    LogInfo("  POST /auth/login, /auth/register, /auth/refresh, /auth/logout");
-    LogInfo("  GET /auth/me");
-    LogInfo("  PUT /auth/profile, /auth/password, /auth/notifications");
-    LogInfo("  DELETE /auth/account");
-    LogInfo("Starting server on {}:{}", host, port);
-    LogInfo("============================================");
+    HTTP_LOG_INFO("Service split: AuthService + DbService");
+    HTTP_LOG_INFO("API endpoints:");
+    HTTP_LOG_INFO("  GET /health, /projects, /projects/:id, /posts, /posts/:id, /docs, /docs/:id");
+    HTTP_LOG_INFO("  POST /auth/login, /auth/register, /auth/refresh, /auth/logout");
+    HTTP_LOG_INFO("  GET /auth/me");
+    HTTP_LOG_INFO("  PUT /auth/profile, /auth/password, /auth/notifications");
+    HTTP_LOG_INFO("  DELETE /auth/account");
+    HTTP_LOG_INFO("Starting server on {}:{}", host, port);
+    HTTP_LOG_INFO("============================================");
 
     HttpServerConfig config;
     config.host = host;
     config.port = port;
     config.backlog = 128;
-    config.io_scheduler_count = 0;
-    config.compute_scheduler_count = 0;
+    config.io_scheduler_count = GALAY_RUNTIME_SCHEDULER_COUNT_AUTO;
+    config.compute_scheduler_count = GALAY_RUNTIME_SCHEDULER_COUNT_AUTO;
 
     HttpServer server(config);
     g_server = &server;
@@ -755,18 +755,18 @@ int main(int argc, char* argv[])
     try {
         server.start(std::move(router));
 
-        LogInfo("Server started successfully!");
-        LogInfo("Open http://localhost:{} in your browser", port);
-        LogInfo("Press Ctrl+C to stop");
+        HTTP_LOG_INFO("Server started successfully!");
+        HTTP_LOG_INFO("Open http://localhost:{} in your browser", port);
+        HTTP_LOG_INFO("Press Ctrl+C to stop");
 
         while (g_running && server.isRunning()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     } catch (const std::exception& e) {
-        LogError("Server error: {}", e.what());
+        HTTP_LOG_ERROR("Server error: {}", e.what());
         return 1;
     }
 
-    LogInfo("Server stopped.");
+    HTTP_LOG_INFO("Server stopped.");
     return 0;
 }

@@ -4,9 +4,9 @@
 
 #include "galay-http/kernel/http/HttpRouter.h"
 #include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpLog.h"
 #include "galay-http/protoc/http/HttpRequest.h"
 #include "galay-http/utils/Http1_1ResponseBuilder.h"
-#include "galay-kernel/common/Log.h"
 
 #include <atomic>
 #include <chrono>
@@ -29,7 +29,7 @@ static TokenStore g_token_store;
 
 void signalHandler(int signum)
 {
-    LogInfo("auth-server received signal {}, shutting down", signum);
+    HTTP_LOG_INFO("auth-server received signal {}, shutting down", signum);
     g_running = false;
     if (g_server) {
         g_server->stop();
@@ -567,7 +567,7 @@ int main(int argc, char* argv[])
     std::signal(SIGTERM, signalHandler);
 
     g_db_client = std::make_unique<DbHttpClient>();
-    LogInfo("auth-server db upstream base url: {}", g_db_client->baseUrl());
+    HTTP_LOG_INFO("auth-server db upstream base url: {}", g_db_client->baseUrl());
 
     HttpRouter router;
     router.addHandler<HttpMethod::GET>("/health", healthHandler);
@@ -598,13 +598,13 @@ int main(int argc, char* argv[])
 
     try {
         server.start(std::move(router));
-        LogInfo("auth-server listening on {}:{}", host, port);
+        HTTP_LOG_INFO("auth-server listening on {}:{}", host, port);
 
         while (g_running && server.isRunning()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     } catch (const std::exception& e) {
-        LogError("auth-server failed: {}", e.what());
+        HTTP_LOG_ERROR("auth-server failed: {}", e.what());
         return 1;
     }
 

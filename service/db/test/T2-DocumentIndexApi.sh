@@ -2,7 +2,7 @@
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8082}"
-seed="$(date +%s)"
+seed="$(date +%s)_$$_$RANDOM"
 project="custom"
 relative_path="docs/doc-${seed}.md"
 

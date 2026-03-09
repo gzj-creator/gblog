@@ -285,8 +285,8 @@ int main(int argc, char* argv[]) {
     config.host = host;
     config.port = port;
     config.backlog = 128;
-    config.io_scheduler_count = 0;      // 自动
-    config.compute_scheduler_count = 0; // 自动
+    config.io_scheduler_count = GALAY_RUNTIME_SCHEDULER_COUNT_AUTO;
+    config.compute_scheduler_count = GALAY_RUNTIME_SCHEDULER_COUNT_AUTO;
 
     // 创建并启动服务器
     HttpServer server(config);

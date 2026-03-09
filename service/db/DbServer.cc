@@ -3,9 +3,9 @@
 
 #include "galay-http/kernel/http/HttpRouter.h"
 #include "galay-http/kernel/http/HttpServer.h"
+#include "galay-http/kernel/http/HttpLog.h"
 #include "galay-http/protoc/http/HttpRequest.h"
 #include "galay-http/utils/Http1_1ResponseBuilder.h"
-#include "galay-kernel/common/Log.h"
 
 #include <atomic>
 #include <chrono>
@@ -17,6 +17,7 @@
 #include <optional>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using namespace galay::http;
@@ -28,7 +29,7 @@ static std::unique_ptr<DbProvider> g_db_provider;
 
 void signalHandler(int signum)
 {
-    LogInfo("db-server received signal {}, shutting down", signum);
+    HTTP_LOG_INFO("db-server received signal {}, shutting down", signum);
     g_running = false;
     if (g_server) {
         g_server->stop();
@@ -360,6 +361,194 @@ std::string indexStateToJson(const DbIndexStateRecord& state)
     return json;
 }
 
+std::expected<std::string, std::string> buildFinishIndexJobSuccessPayload(DbProvider& db_provider,
+                                                                          std::uint64_t job_id)
+{
+    const auto jobResult = db_provider.finishIndexJobSuccess(job_id);
+    if (!jobResult) {
+        return std::unexpected(jobResult.error());
+    }
+
+    const auto stateResult = db_provider.getIndexState();
+    if (!stateResult) {
+        return std::unexpected(stateResult.error());
+    }
+
+    const std::string jobJson = indexJobToJson(*jobResult);
+    const std::string indexStateJson = indexStateToJson(*stateResult);
+
+    std::string payload;
+    payload.reserve(jobJson.size() + indexStateJson.size() + 32);
+    payload += "{\"job\":";
+    payload += jobJson;
+    payload += ",\"index_state\":";
+    payload += indexStateJson;
+    payload += "}";
+    return payload;
+}
+
+HttpResponse buildCreateUserResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const std::string body = req.bodyStr();
+    DbCreateUserInput input;
+    input.m_username = extractJsonStringField(body, "username").value_or("");
+    input.m_email = extractJsonStringField(body, "email").value_or("");
+    input.m_display_name = extractJsonStringField(body, "display_name").value_or(input.m_username);
+    input.m_bio = extractJsonStringField(body, "bio").value_or("");
+    input.m_website = extractJsonStringField(body, "website").value_or("");
+    input.m_github = extractJsonStringField(body, "github").value_or("");
+    input.m_password_salt = extractJsonStringField(body, "password_salt").value_or("");
+    input.m_password_hash = extractJsonStringField(body, "password_hash").value_or("");
+
+    if (input.m_username.empty() || input.m_email.empty() || input.m_password_salt.empty() ||
+        input.m_password_hash.empty()) {
+        return makeBadRequestResponse(makeErrorJson(
+            "username/email/password_salt/password_hash required"));
+    }
+
+    const auto result = g_db_provider->createUser(input);
+    if (!result) {
+        return makeBadRequestResponse(makeErrorJson(result.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(userToJson(*result)));
+}
+
+HttpResponse buildUpdateUserResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const auto userId = parseUint64(extractPathTail(req));
+    if (!userId.has_value()) {
+        return makeBadRequestResponse(makeErrorJson("invalid user id"));
+    }
+
+    const std::string body = req.bodyStr();
+    DbUpdateUserInput input;
+    input.m_email = extractJsonStringField(body, "email");
+    input.m_display_name = extractJsonStringField(body, "display_name");
+    input.m_bio = extractJsonStringField(body, "bio");
+    input.m_website = extractJsonStringField(body, "website");
+    input.m_github = extractJsonStringField(body, "github");
+
+    const auto result = g_db_provider->updateUser(*userId, input);
+    if (!result) {
+        if (result.error() == "user not found") {
+            return makeNotFoundResponse(makeErrorJson(result.error()));
+        }
+        return makeBadRequestResponse(makeErrorJson(result.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(userToJson(*result)));
+}
+
+HttpResponse buildUpdatePasswordResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const auto userId = parseUint64(extractPathTail(req));
+    if (!userId.has_value()) {
+        return makeBadRequestResponse(makeErrorJson("invalid user id"));
+    }
+
+    const std::string body = req.bodyStr();
+    DbUpdatePasswordInput input;
+    input.m_password_salt = extractJsonStringField(body, "password_salt").value_or("");
+    input.m_password_hash = extractJsonStringField(body, "password_hash").value_or("");
+
+    if (input.m_password_salt.empty() || input.m_password_hash.empty()) {
+        return makeBadRequestResponse(makeErrorJson("password_salt/password_hash required"));
+    }
+
+    const auto result = g_db_provider->updatePassword(*userId, input);
+    if (!result) {
+        if (result.error() == "user not found") {
+            return makeNotFoundResponse(makeErrorJson(result.error()));
+        }
+        return makeBadRequestResponse(makeErrorJson(result.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(userToJson(*result)));
+}
+
+HttpResponse buildUpdateNotificationsResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const auto userId = parseUint64(extractPathTail(req));
+    if (!userId.has_value()) {
+        return makeBadRequestResponse(makeErrorJson("invalid user id"));
+    }
+
+    const std::string body = req.bodyStr();
+    DbUpdateNotificationsInput input;
+    input.m_email_notifications = extractJsonBoolField(body, "email_notifications");
+    input.m_new_post_notifications = extractJsonBoolField(body, "new_post_notifications");
+    input.m_comment_reply_notifications = extractJsonBoolField(body, "comment_reply_notifications");
+    input.m_release_notifications = extractJsonBoolField(body, "release_notifications");
+
+    const auto result = g_db_provider->updateNotifications(*userId, input);
+    if (!result) {
+        if (result.error() == "user not found") {
+            return makeNotFoundResponse(makeErrorJson(result.error()));
+        }
+        return makeBadRequestResponse(makeErrorJson(result.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(userToJson(*result)));
+}
+
+HttpResponse buildFinishIndexJobSuccessResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const std::string body = req.bodyStr();
+    const auto jobId = extractJsonUint64Field(body, "job_id");
+    if (!jobId.has_value()) {
+        return makeBadRequestResponse(makeErrorJson("job_id required"));
+    }
+
+    const auto payloadResult = buildFinishIndexJobSuccessPayload(*g_db_provider, *jobId);
+    if (!payloadResult) {
+        return makeBadRequestResponse(makeErrorJson(payloadResult.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(*payloadResult));
+}
+
+HttpResponse buildFinishIndexJobFailedResponse(HttpRequest req)
+{
+    if (!g_db_provider) {
+        return makeBadRequestResponse(makeErrorJson("db provider unavailable"));
+    }
+
+    const std::string body = req.bodyStr();
+    const auto jobId = extractJsonUint64Field(body, "job_id");
+    const std::string errorMessage = extractJsonStringField(body, "error_message").value_or("index failed");
+    if (!jobId.has_value()) {
+        return makeBadRequestResponse(makeErrorJson("job_id required"));
+    }
+
+    const auto result = g_db_provider->finishIndexJobFailed(*jobId, errorMessage);
+    if (!result) {
+        return makeBadRequestResponse(makeErrorJson(result.error()));
+    }
+
+    return makeOkResponse(makeSuccessJson(indexJobToJson(*result)));
+}
+
 #define RETURN_RESPONSE(RESPONSE_EXPR)                                                      \
     do {                                                                                    \
         auto writer = conn.getWriter();                                                     \
@@ -381,33 +570,7 @@ Coroutine healthHandler(HttpConn& conn, HttpRequest req)
 
 Coroutine createUserHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const std::string body = req.bodyStr();
-    DbCreateUserInput input;
-    input.m_username = extractJsonStringField(body, "username").value_or("");
-    input.m_email = extractJsonStringField(body, "email").value_or("");
-    input.m_display_name = extractJsonStringField(body, "display_name").value_or(input.m_username);
-    input.m_bio = extractJsonStringField(body, "bio").value_or("");
-    input.m_website = extractJsonStringField(body, "website").value_or("");
-    input.m_github = extractJsonStringField(body, "github").value_or("");
-    input.m_password_salt = extractJsonStringField(body, "password_salt").value_or("");
-    input.m_password_hash = extractJsonStringField(body, "password_hash").value_or("");
-
-    if (input.m_username.empty() || input.m_email.empty() || input.m_password_salt.empty() ||
-        input.m_password_hash.empty()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(
-            "username/email/password_salt/password_hash required")));
-    }
-
-    const auto result = g_db_provider->createUser(input);
-    if (!result) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(result.error())));
-    }
-
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(userToJson(*result))));
+    RETURN_RESPONSE(buildCreateUserResponse(std::move(req)));
 }
 
 Coroutine getUserByUsernameHandler(HttpConn& conn, HttpRequest req)
@@ -456,92 +619,17 @@ Coroutine getUserByIdHandler(HttpConn& conn, HttpRequest req)
 
 Coroutine updateUserHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const auto userId = parseUint64(extractPathTail(req));
-    if (!userId.has_value()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("invalid user id")));
-    }
-
-    const std::string body = req.bodyStr();
-    DbUpdateUserInput input;
-    input.m_email = extractJsonStringField(body, "email");
-    input.m_display_name = extractJsonStringField(body, "display_name");
-    input.m_bio = extractJsonStringField(body, "bio");
-    input.m_website = extractJsonStringField(body, "website");
-    input.m_github = extractJsonStringField(body, "github");
-
-    const auto result = g_db_provider->updateUser(*userId, input);
-    if (!result) {
-        if (result.error() == "user not found") {
-            RETURN_RESPONSE(makeNotFoundResponse(makeErrorJson(result.error())));
-        }
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(result.error())));
-    }
-
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(userToJson(*result))));
+    RETURN_RESPONSE(buildUpdateUserResponse(std::move(req)));
 }
 
 Coroutine updatePasswordHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const auto userId = parseUint64(extractPathTail(req));
-    if (!userId.has_value()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("invalid user id")));
-    }
-
-    const std::string body = req.bodyStr();
-    DbUpdatePasswordInput input;
-    input.m_password_salt = extractJsonStringField(body, "password_salt").value_or("");
-    input.m_password_hash = extractJsonStringField(body, "password_hash").value_or("");
-
-    if (input.m_password_salt.empty() || input.m_password_hash.empty()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("password_salt/password_hash required")));
-    }
-
-    const auto result = g_db_provider->updatePassword(*userId, input);
-    if (!result) {
-        if (result.error() == "user not found") {
-            RETURN_RESPONSE(makeNotFoundResponse(makeErrorJson(result.error())));
-        }
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(result.error())));
-    }
-
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(userToJson(*result))));
+    RETURN_RESPONSE(buildUpdatePasswordResponse(std::move(req)));
 }
 
 Coroutine updateNotificationsHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const auto userId = parseUint64(extractPathTail(req));
-    if (!userId.has_value()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("invalid user id")));
-    }
-
-    const std::string body = req.bodyStr();
-    DbUpdateNotificationsInput input;
-    input.m_email_notifications = extractJsonBoolField(body, "email_notifications");
-    input.m_new_post_notifications = extractJsonBoolField(body, "new_post_notifications");
-    input.m_comment_reply_notifications = extractJsonBoolField(body, "comment_reply_notifications");
-    input.m_release_notifications = extractJsonBoolField(body, "release_notifications");
-
-    const auto result = g_db_provider->updateNotifications(*userId, input);
-    if (!result) {
-        if (result.error() == "user not found") {
-            RETURN_RESPONSE(makeNotFoundResponse(makeErrorJson(result.error())));
-        }
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(result.error())));
-    }
-
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(userToJson(*result))));
+    RETURN_RESPONSE(buildUpdateNotificationsResponse(std::move(req)));
 }
 
 Coroutine deleteUserHandler(HttpConn& conn, HttpRequest req)
@@ -757,50 +845,12 @@ Coroutine getIndexJobHandler(HttpConn& conn, HttpRequest req)
 
 Coroutine finishIndexJobSuccessHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const std::string body = req.bodyStr();
-    const auto jobId = extractJsonUint64Field(body, "job_id");
-    if (!jobId.has_value()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("job_id required")));
-    }
-
-    const auto jobResult = g_db_provider->finishIndexJobSuccess(*jobId);
-    if (!jobResult) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(jobResult.error())));
-    }
-
-    const auto stateResult = g_db_provider->getIndexState();
-    if (!stateResult) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(stateResult.error())));
-    }
-
-    const std::string payload = "{\"job\":" + indexJobToJson(*jobResult) +
-                                ",\"index_state\":" + indexStateToJson(*stateResult) + "}";
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(payload)));
+    RETURN_RESPONSE(buildFinishIndexJobSuccessResponse(std::move(req)));
 }
 
 Coroutine finishIndexJobFailedHandler(HttpConn& conn, HttpRequest req)
 {
-    if (!g_db_provider) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("db provider unavailable")));
-    }
-
-    const std::string body = req.bodyStr();
-    const auto jobId = extractJsonUint64Field(body, "job_id");
-    const std::string errorMessage = extractJsonStringField(body, "error_message").value_or("index failed");
-    if (!jobId.has_value()) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson("job_id required")));
-    }
-
-    const auto result = g_db_provider->finishIndexJobFailed(*jobId, errorMessage);
-    if (!result) {
-        RETURN_RESPONSE(makeBadRequestResponse(makeErrorJson(result.error())));
-    }
-
-    RETURN_RESPONSE(makeOkResponse(makeSuccessJson(indexJobToJson(*result))));
+    RETURN_RESPONSE(buildFinishIndexJobFailedResponse(std::move(req)));
 }
 
 Coroutine getIndexStateHandler(HttpConn& conn, HttpRequest req)
@@ -882,13 +932,13 @@ int main(int argc, char* argv[])
 
     try {
         server.start(std::move(router));
-        LogInfo("db-server listening on {}:{}", host, port);
+        HTTP_LOG_INFO("db-server listening on {}:{}", host, port);
 
         while (g_running && server.isRunning()) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     } catch (const std::exception& e) {
-        LogError("db-server failed: {}", e.what());
+        HTTP_LOG_ERROR("db-server failed: {}", e.what());
         return 1;
     }
 

@@ -3,7 +3,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8081}"
 DB_BASE_URL="${DB_BASE_URL:-http://127.0.0.1:8082}"
-seed="$(date +%s)"
+seed="$(date +%s)_$$_$RANDOM"
 username="auth_u_${seed}"
 email="${username}@test.local"
 password_plain="Pass_${seed}_A"
